@@ -751,6 +751,9 @@ namespace UberSideJobMod
         #region Passenger Management
         private void GenerateNewPassengerForPool()
         {
+            List<string> maleConversationLines = new List<string>();
+            List<string> femaleConversationLines = new List<string>();
+
             if (addresses.Count < 2) return;
 
             int currentHour = Il2Cpp.TimeHelper.CurrentHour;
@@ -788,12 +791,14 @@ namespace UberSideJobMod
                 else passengerType = PassengerType.Party;
             }
 
+            // Get preferred business types for the passenger
             List<BusinessTypeName> preferredBusinessTypes = businessTypePool.preferredBusinessTypes[passengerType];
 
+            // Filter residential and business addresses
             List<Address> residentialAddresses = addresses.Where(a => a.buildingType.ToLower() == "residential").ToList();
             if (residentialAddresses.Count == 0)
             {
-                MelonLogger.Warning("No Residential addresses found. Falling back to all addresses for Residential selection.");
+                MelonLogger.Warning("No Residential addresses found. Falling back to all addresses.");
                 residentialAddresses = addresses.ToList();
             }
 
@@ -804,8 +809,7 @@ namespace UberSideJobMod
                 {
                     if (passengerType == PassengerType.Party)
                     {
-                        preferredBusinessAddresses = addresses.Where(a =>
-                            preferredBusinessTypes.Contains(a.businessType)).ToList();
+                        preferredBusinessAddresses = addresses.Where(a => preferredBusinessTypes.Contains(a.businessType)).ToList();
                     }
                     else
                     {
@@ -854,6 +858,7 @@ namespace UberSideJobMod
                 }
             }
 
+            // Determine pickup address
             Address pickupAddress;
             float residentialPickupChance;
             if (currentHour >= 5 && currentHour < 10)
@@ -879,6 +884,7 @@ namespace UberSideJobMod
                 pickupAddress = preferredBusinessAddresses[UnityEngine.Random.Range(0, preferredBusinessAddresses.Count)];
             }
 
+            // Determine dropoff address
             Address dropoffAddress;
             float residentialDropoffChance;
             if (currentHour >= 5 && currentHour < 10)
@@ -910,7 +916,7 @@ namespace UberSideJobMod
                         .ToList();
                     if (possibleDropoffAddresses.Count == 0)
                     {
-                        MelonLogger.Warning($"No different business type dropoff addresses for {passengerType} after {pickupBusinessType} pickup.");
+                        // [HOTFIX] leave it, because the party passenger are only have residential after the Nightclub.
                         possibleDropoffAddresses = preferredBusinessAddresses.Where(a => a.gameAddress != pickupAddress.gameAddress).ToList();
                     }
                 }
@@ -922,11 +928,9 @@ namespace UberSideJobMod
 
             if (possibleDropoffAddresses.Count == 0)
             {
-                MelonLogger.Warning($"No valid dropoff addresses for {passengerType} after pickup selection. Using fallback.");
                 possibleDropoffAddresses = addresses.Where(a => a.gameAddress != pickupAddress.gameAddress).ToList();
                 if (possibleDropoffAddresses.Count == 0)
                 {
-                    MelonLogger.Error("No valid dropoff addresses available. Aborting passenger generation.");
                     return;
                 }
             }
@@ -934,10 +938,10 @@ namespace UberSideJobMod
 
             if (!buildingPositions.ContainsKey(pickupAddress.gameAddress) || !buildingPositions.ContainsKey(dropoffAddress.gameAddress))
             {
-                MelonLogger.Error("Could not find building positions for pickup or dropoff address");
                 return;
             }
 
+            // Calculate fare
             Vector3 pickupPos = buildingPositions[pickupAddress.gameAddress];
             Vector3 dropoffPos = buildingPositions[dropoffAddress.gameAddress];
             float distance = Vector3.Distance(pickupPos, dropoffPos);
@@ -950,32 +954,93 @@ namespace UberSideJobMod
                 fareMultiplier *= PeakMultiplier;
             float fare = CalculateFare(distance) * fareMultiplier;
 
+            // Generate passenger details
             Gender passengerGender = UnityEngine.Random.Range(0, 2) == 0 ? Gender.Male : Gender.Female;
             string passengerName = GeneratePassengerName(passengerGender);
 
-            string pickupLocationName = pickupAddress.buildingType.ToLower() == "residential" ? "Residential" : pickupAddress.businessType.ToString();
-            string dropoffLocationName = dropoffAddress.buildingType.ToLower() == "residential" ? "Residential" : dropoffAddress.businessType.ToString();
+            // Get location display names
+            string pickupDisplayName = GetDisplayLocationName(pickupAddress.buildingType, pickupAddress.businessType.ToString());
+            string dropoffDisplayName = GetDisplayLocationName(dropoffAddress.buildingType, dropoffAddress.businessType.ToString());
+            string pickupLocationType = pickupAddress.buildingType.ToLower() == "residential" ? "Residential" : pickupAddress.businessType.ToString();
+            string dropoffLocationType = dropoffAddress.buildingType.ToLower() == "residential" ? "Residential" : dropoffAddress.businessType.ToString();
+
+            // Generate conversation lines
             List<string> conversationLines = new List<string>();
+            bool isSameBusinessType = !isResidentialPickup && !isResidentialDropoff && pickupLocationType == dropoffLocationType;
+            bool isNight = currentHour >= 22 || currentHour < 6;
+
             if (passengerType == PassengerType.Business)
             {
-                string dynamicKey = (currentHour >= 22 || currentHour < 6) ? "dynamic_night" : "dynamic_day";
+                string dynamicKey = isNight ? "dynamic_night" : (isSameBusinessType ? "dynamic_day_same_type" : "dynamic_day");
                 if (PassengerDialogues.Comments[passengerType].ContainsKey(dynamicKey))
                 {
-                    foreach (var line in PassengerDialogues.Comments[passengerType][dynamicKey][passengerGender])
+                    foreach (var line in PassengerDialogues.Comments[passengerType][dynamicKey][Gender.Male])
                     {
-                        conversationLines.Add(string.Format(line, pickupLocationName, dropoffLocationName));
+                        string formattedLine = string.Format(line, pickupDisplayName, dropoffDisplayName);
+                        maleConversationLines.Add(formattedLine);
+                    }
+                    foreach (var line in PassengerDialogues.Comments[passengerType][dynamicKey][Gender.Female])
+                    {
+                        string formattedLine = string.Format(line, pickupDisplayName, dropoffDisplayName);
+                        femaleConversationLines.Add(formattedLine);
                     }
                 }
             }
-            else if (PassengerDialogues.Comments[passengerType].ContainsKey("dynamic"))
+            else if (passengerType == PassengerType.Tourist)
             {
-                foreach (var line in PassengerDialogues.Comments[passengerType]["dynamic"][passengerGender])
+                string dynamicKey = isResidentialDropoff ? "dynamic_to_residential" : "dynamic";
+                if (PassengerDialogues.Comments[passengerType].ContainsKey(dynamicKey))
                 {
-                    conversationLines.Add(string.Format(line, pickupLocationName, dropoffLocationName));
+                    foreach (var line in PassengerDialogues.Comments[passengerType][dynamicKey][Gender.Male])
+                    {
+                        string formattedLine = string.Format(line, pickupDisplayName, dropoffDisplayName);
+                        maleConversationLines.Add(formattedLine);
+                    }
+                    foreach (var line in PassengerDialogues.Comments[passengerType][dynamicKey][Gender.Female])
+                    {
+                        string formattedLine = string.Format(line, pickupDisplayName, dropoffDisplayName);
+                        femaleConversationLines.Add(formattedLine);
+                    }
                 }
             }
+            else if (passengerType == PassengerType.Party)
+            {
+                string dynamicKey = isSameBusinessType ? "dynamic_same_type" : "dynamic";
+                if (PassengerDialogues.Comments[passengerType].ContainsKey(dynamicKey))
+                {
+                    foreach (var line in PassengerDialogues.Comments[passengerType][dynamicKey][Gender.Male])
+                    {
+                        string formattedLine = string.Format(line, pickupDisplayName, dropoffDisplayName);
+                        maleConversationLines.Add(formattedLine);
+                    }
+                    foreach (var line in PassengerDialogues.Comments[passengerType][dynamicKey][Gender.Female])
+                    {
+                        string formattedLine = string.Format(line, pickupDisplayName, dropoffDisplayName);
+                        femaleConversationLines.Add(formattedLine);
+                    }
+                }
+            }
+            else if (passengerType == PassengerType.Regular || passengerType == PassengerType.Silent)
+            {
+                if (PassengerDialogues.Comments[passengerType].ContainsKey("dynamic"))
+                {
+                    foreach (var line in PassengerDialogues.Comments[passengerType]["dynamic"][Gender.Male])
+                    {
+                        string formattedLine = string.Format(line, pickupDisplayName, dropoffDisplayName);
+                        maleConversationLines.Add(formattedLine);
+                    }
+                    foreach (var line in PassengerDialogues.Comments[passengerType]["dynamic"][Gender.Female])
+                    {
+                        string formattedLine = string.Format(line, pickupDisplayName, dropoffDisplayName);
+                        femaleConversationLines.Add(formattedLine);
+                    }
+                }
+            }
+
+            // as-is
             conversationLines.AddRange(PassengerDialogues.Comments[passengerType]["regular"][passengerGender]);
 
+            // Create passenger
             var newPassenger = new UberPassenger
             {
                 pickupAddress = pickupAddress,
@@ -992,8 +1057,14 @@ namespace UberSideJobMod
                 collisionCount = 0,
                 suddenStopCount = 0,
                 totalSpeedingTime = 0f,
-                gender = passengerGender
+                gender = passengerGender,
+                dynamicLineCount = conversationLines.Count(l => l.Contains(pickupDisplayName) || l.Contains(dropoffDisplayName))
             };
+
+            newPassenger.maleConversationLines = maleConversationLines.ToArray();
+            newPassenger.femaleConversationLines = femaleConversationLines.ToArray();
+            newPassenger.conversationLines = conversationLines.ToArray();
+            newPassenger.dynamicLineCount = maleConversationLines.Count;
 
             passengerPool.Enqueue(newPassenger);
         }
@@ -1141,7 +1212,6 @@ namespace UberSideJobMod
             string dropoffDisplayName = GetDisplayLocationName(
                 currentPassenger.dropoffAddress.buildingType,
                 currentPassenger.dropoffAddress.businessType.ToString());
-
             string pickupLocationType = currentPassenger.pickupAddress.buildingType.ToLower() == "residential"
                 ? "Residential"
                 : currentPassenger.pickupAddress.businessType.ToString();
@@ -1151,110 +1221,53 @@ namespace UberSideJobMod
 
             bool isSameResidential = pickupLocationType == "Residential" && dropoffLocationType == "Residential";
             bool isSameBusinessType = !isSameResidential && pickupLocationType == dropoffLocationType;
+            bool isNight = Il2Cpp.TimeHelper.CurrentHour >= 22 || Il2Cpp.TimeHelper.CurrentHour < 6;
 
-            if (commentType.StartsWith("dynamic") || commentType == "regular")
+            if (commentType == "regular" && currentPassenger.dynamicLineCount > 0 && conversationRandom.Next(0, 100) < 50)
             {
-                if (isSameResidential && commentType.StartsWith("dynamic"))
+                string dynamicCommentType = "dynamic";
+                if (currentPassenger.passengerType == PassengerType.Business)
                 {
-                    commentType = "regular";
+                    dynamicCommentType = isNight ? "dynamic_night" : (isSameBusinessType ? "dynamic_day_same_type" : "dynamic_day");
+                }
+                else if (currentPassenger.passengerType == PassengerType.Party)
+                {
+                    dynamicCommentType = isSameBusinessType ? "dynamic_same_type" : "dynamic";
+                }
+                else if (currentPassenger.passengerType == PassengerType.Tourist)
+                {
+                    dynamicCommentType = dropoffLocationType == "Residential" ? "dynamic_to_residential" : "dynamic";
                 }
 
-                if (commentType == "regular")
+                var dynamicLines = (playerGender == Gender.Male ? currentPassenger.maleConversationLines : currentPassenger.femaleConversationLines)
+                    .Where(line => line.Contains(pickupDisplayName) || line.Contains(dropoffDisplayName))
+                    .ToList();
+
+                if (dynamicLines.Count > 0)
                 {
-                    bool canUseDynamic = !isSameResidential && !(isSameBusinessType && currentPassenger.passengerType == PassengerType.Regular);
-                    if (conversationRandom.Next(0, 100) < 50 && currentPassenger.conversationLines.Length > 0 && canUseDynamic)
-                    {
-                        string dynamicCommentType = "dynamic";
-                        if (currentPassenger.passengerType == PassengerType.Business)
-                        {
-                            int currentHour = Il2Cpp.TimeHelper.CurrentHour;
-                            if (currentHour >= 22 || currentHour < 6)
-                            {
-                                dynamicCommentType = "dynamic_night";
-                            }
-                            else
-                            {
-                                dynamicCommentType = isSameBusinessType ? "dynamic_day_same_type" : "dynamic_day";
-                            }
-                        }
-                        else if (isSameBusinessType && currentPassenger.passengerType == PassengerType.Party)
-                        {
-                            dynamicCommentType = "dynamic_same_type";
-                        }
-
-                        var dynamicLines = currentPassenger.conversationLines
-                            .Where(line => line.Contains(pickupLocationType) || line.Contains(dropoffLocationType))
-                            .ToList();
-
-                        if (dynamicLines.Count > 0)
-                        {
-                            string key = $"dynamic_{currentPassenger.passengerType}_{playerGender}";
-                            conversation = dynamicLines[ConversationTracker.GetRandomLineIndex(dynamicLines, key)];
-                            isDynamicLine = true;
-
-                            conversation = conversation
-                                .Replace("{0}", pickupDisplayName)
-                                .Replace("{1}", dropoffDisplayName)
-                                .Replace("Residential", pickupDisplayName)
-                                .Replace(pickupLocationType, pickupDisplayName)
-                                .Replace(dropoffLocationType, dropoffDisplayName);
-                        }
-                        else
-                        {
-                            if (currentPassenger.passengerType == PassengerType.Tourist && !currentPassenger.hadSpecialConversation && !hasQueuedSpecialTouristComment && conversationCount < 2)
-                            {
-                                MelonCoroutines.Start(ShowSpecialTouristConversation());
-                                hasQueuedSpecialTouristComment = true;
-                                return;
-                            }
-                            conversation = PassengerDialogues.GetRandomComment(currentPassenger.passengerType, commentType, playerGender);
-                        }
-                    }
-                    else
-                    {
-                        if (currentPassenger.passengerType == PassengerType.Tourist && !currentPassenger.hadSpecialConversation && !hasQueuedSpecialTouristComment && conversationCount < 2)
-                        {
-                            MelonCoroutines.Start(ShowSpecialTouristConversation());
-                            hasQueuedSpecialTouristComment = true;
-                            return;
-                        }
-                        conversation = PassengerDialogues.GetRandomComment(currentPassenger.passengerType, commentType, playerGender);
-                    }
+                    string key = $"dynamic_{currentPassenger.passengerType}_{playerGender}";
+                    conversation = dynamicLines[ConversationTracker.GetRandomLineIndex(dynamicLines, key)];
+                    isDynamicLine = true;
                 }
                 else
                 {
-                    if (currentPassenger.passengerType == PassengerType.Business)
+                    if (currentPassenger.passengerType == PassengerType.Tourist && !currentPassenger.hadSpecialConversation && !hasQueuedSpecialTouristComment && conversationCount < 2)
                     {
-                        int currentHour = Il2Cpp.TimeHelper.CurrentHour;
-                        if (currentHour >= 22 || currentHour < 6)
-                        {
-                            commentType = "dynamic_night";
-                        }
-                        else
-                        {
-                            commentType = isSameBusinessType ? "dynamic_day_same_type" : "dynamic_day";
-                        }
+                        MelonCoroutines.Start(ShowSpecialTouristConversation());
+                        hasQueuedSpecialTouristComment = true;
+                        return;
                     }
-                    else if (currentPassenger.passengerType == PassengerType.Party && isSameBusinessType)
-                    {
-                        commentType = "dynamic_same_type";
-                    }
-
                     conversation = PassengerDialogues.GetRandomComment(currentPassenger.passengerType, commentType, playerGender);
-                    if (!string.IsNullOrEmpty(conversation))
-                    {
-                        conversation = conversation
-                            .Replace("{0}", pickupDisplayName)
-                            .Replace("{1}", dropoffDisplayName)
-                            .Replace("Residential", pickupDisplayName)
-                            .Replace(pickupLocationType, pickupDisplayName)
-                            .Replace(dropoffLocationType, dropoffDisplayName);
-                        isDynamicLine = true;
-                    }
                 }
             }
             else
             {
+                if (currentPassenger.passengerType == PassengerType.Tourist && !currentPassenger.hadSpecialConversation && !hasQueuedSpecialTouristComment && conversationCount < 2)
+                {
+                    MelonCoroutines.Start(ShowSpecialTouristConversation());
+                    hasQueuedSpecialTouristComment = true;
+                    return;
+                }
                 conversation = PassengerDialogues.GetRandomComment(currentPassenger.passengerType, commentType, playerGender);
             }
 
@@ -1283,7 +1296,6 @@ namespace UberSideJobMod
 
             MelonCoroutines.Start(ResetConversationFlag());
         }
-
         private string GetPassengerGreeting(string commentType)
         {
             List<string> greetings;
@@ -2167,7 +2179,6 @@ namespace UberSideJobMod
             }
             catch (Exception ex)
             {
-                MelonLogger.Error($"Failed to use game notification system: {ex.Message}");
             }
         }
 

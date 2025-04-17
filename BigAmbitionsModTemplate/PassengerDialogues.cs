@@ -185,7 +185,6 @@ namespace UberSideJobMod
                         }}
                 }
             },
-            // Other passenger types remain unchanged for brevity
             { PassengerType.Business, new Dictionary<string, Dictionary<Gender, List<string>>>
                 {
                     {"regular", new Dictionary<Gender, List<string>>
@@ -274,7 +273,7 @@ namespace UberSideJobMod
                                 "From the Residential to the {1}—late-night prep, bro."
                             }},
                             { Gender.Female, new List<string> {
-                                "Client drinks at the {0}, now to the {1}—hurry, ma'am!.",
+                                "Client drinks at the {0}, now to the {1}—hurry.",
                                 "Checking the {0} late, off to the {1}—important, hon.",
                                 "Left the {0}, heading to the {1}—can’t wait, sweetie.",
                                 "From the {0} to the Residential for a late client call.",
@@ -376,12 +375,12 @@ namespace UberSideJobMod
                                 "How long you driven here, bro?",
                                 "These buildings are wild!",
                                 "City’s nuts compared to home.",
-                                "Got BBQ spots, man",
+                                "Got BBQ spots, man?",
                                 "Tacos here legit?",
                                 "Here for the weekend, tryna see it all!",
-                                "Hot as hell out here, dude",
+                                "Hot as hell out here, dude.",
                                 "No skyscrapers like this back home!",
-                                "Museums worth it",
+                                "Museums worth it?",
                                 "This place is dope!",
                                 "Nightlife tips, dude?",
                                 "Snapping pics for my blog!",
@@ -399,11 +398,11 @@ namespace UberSideJobMod
                                 "Any BBQ places?",
                                 "Heard the tacos?",
                                 "Just a weekend trip—wanna see it all!",
-                                "Super warm out here",
+                                "Super warm out here.",
                                 "My town’s got nothing this tall!",
                                 "Good museums, arigatou?",
-                                "This city’s amazing",
-                                "Know cool nightlife",
+                                "This city’s amazing!",
+                                "Know cool nightlife?",
                                 "Getting pics for my blog!",
                                 "Those food carts—yum!",
                                 "I’d be lost without you!",
@@ -424,6 +423,21 @@ namespace UberSideJobMod
                                 "Visited the {0}, now going to the {1}—this place is incredible, love!",
                                 "Wow, the {0} was so cool, heading to the {1}—any suggestions, dear?",
                                 "First time at a {0} like that, off to the {1}—best trip ever, sweetie!"
+                            }}
+                        }},
+                    {"dynamic_to_residential", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "The {0} was awesome, now heading back to my place—great day, man!",
+                                "Checked out the {0}, calling it a night at home—this city’s wild, dude!",
+                                "Man, the {0} blew my mind, heading to my rental—any shortcuts, bro?",
+                                "Loved the {0}, off to crash at my place—amazing trip, pal!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "The {0} was incredible, heading back to my place—such a fun day, hon!",
+                                "Visited the {0}, now off to my rental—this city’s amazing, love!",
+                                "Wow, the {0} was so cool, heading home to rest—any quick routes, dear?",
+                                "First time at a {0}, now back to my place—best trip ever, sweetie!"
                             }}
                         }},
                     {"flirty", new Dictionary<Gender, List<string>>

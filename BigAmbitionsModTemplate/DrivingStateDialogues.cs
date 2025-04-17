@@ -109,7 +109,7 @@ namespace UberSideJobMod
             {
                 ["speeding"] = new List<string>
                 {
-                    "Yo {playerName}, slow down—we're not at the club yet!",
+                    "Yo {playerName}, slow down will ya? sorry.", // [HOTFIX] out of context if this is from business to residential.
                     "Hey {playerName}, chill on the speed, let's keep the vibes cool!",
                     "Whoa {playerName}, ease up, I don't wanna spill my drink!",
                     "Whoa {playerName}, slow it down—the party's at the destination!",

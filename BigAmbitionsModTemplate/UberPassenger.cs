@@ -15,7 +15,6 @@ namespace UberSideJobMod
     }
     public class UberPassenger
     {
-        // Add this to your existing UberPassenger class properties
         public int collisionCount { get; set; } = 0;
 
         public float pickupTime = -1f;
@@ -33,6 +32,8 @@ namespace UberSideJobMod
         public float waitTime { get; set; } = 0f;
         public bool isCancelled { get; set; } = false;
         public string[] conversationLines { get; set; }
+        public string[] maleConversationLines;
+        public string[] femaleConversationLines;
         public int suddenStopCount { get; set; } = 0;
         public float totalSpeedingTime { get; set; } = 0f;
         public float tipAmount { get; set; } = 0f;
