@@ -130,8 +130,7 @@ namespace UberSideJobMod
                 containerRT.anchorMin = new Vector2(0.5f, 1);
                 containerRT.anchorMax = new Vector2(0.5f, 1);
                 containerRT.pivot = new Vector2(0.5f, 1);
-                containerRT.anchoredPosition = new Vector2(0, -175);
-                containerRT.sizeDelta = new Vector2(900, 600);
+                containerRT.anchoredPosition = new Vector2(0, -85);
             }
             catch (Exception)
             {
@@ -163,11 +162,13 @@ namespace UberSideJobMod
             try
             {
                 ContentSizeFitter fitter = container.AddComponent<ContentSizeFitter>();
-                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
                 fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
                 notificationContainer = container.transform;
                 success = true;
+
+                RectTransform containerRT = container.GetComponent<RectTransform>();
             }
             catch (Exception)
             {
@@ -177,6 +178,9 @@ namespace UberSideJobMod
 
             isInitialized = success;
             isInitializing = false;
+
+            yield return null;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(container.GetComponent<RectTransform>());
         }
 
         private Il2CppUI.Notification.NotificationType MapToGameNotificationType(NotificationType type)
@@ -192,7 +196,7 @@ namespace UberSideJobMod
                 case NotificationType.Warning:
                     return Il2CppUI.Notification.NotificationType.Warning; // 1
                 default:
-                    return Il2CppUI.Notification.NotificationType.Info; // 3, fallback
+                    return Il2CppUI.Notification.NotificationType.Info; // 3
             }
         }
 
@@ -296,7 +300,7 @@ namespace UberSideJobMod
             VerticalLayoutGroup notifLayout = notification.AddComponent<VerticalLayoutGroup>();
             notifLayout.padding = new RectOffset(32, 20, 15, 15);
             notifLayout.spacing = 8;
-            notifLayout.childAlignment = TextAnchor.MiddleLeft;
+            notifLayout.childAlignment = TextAnchor.UpperLeft;
             notifLayout.childControlHeight = false;
             notifLayout.childControlWidth = false;
             notifLayout.childForceExpandHeight = false;
@@ -315,8 +319,8 @@ namespace UberSideJobMod
             Text text = textObj.AddComponent<Text>();
             text.text = message;
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            text.fontSize = 28;
-            text.alignment = TextAnchor.MiddleLeft;
+            text.fontSize = 14;
+            text.alignment = TextAnchor.UpperLeft;
             text.color = Color.white;
             text.supportRichText = true;
             text.resizeTextForBestFit = false;

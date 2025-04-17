@@ -1,4 +1,7 @@
 ﻿using System.Collections.Generic;
+using Il2CppEnums;
+using MelonLoader;
+using System.Linq;
 
 namespace UberSideJobMod
 {
@@ -14,7 +17,7 @@ namespace UberSideJobMod
             "Lawrence", "Ryan", "Gary", "Jeremy", "Louis", "Randy", "Howard", "Eugene", "Vincent"
         };
 
-                public static string[] FemaleFirstNames = {
+        public static string[] FemaleFirstNames = {
             "Sarah", "Emma", "Olivia", "Ava", "Isabella", "Sophia", "Charlotte", "Mia", "Amelia", "Harper",
             "Evelyn", "Abigail", "Emily", "Elizabeth", "Sofia", "Madison", "Scarlett", "Victoria", "Grace",
             "Lily", "Hannah", "Julia", "Natalie", "Chloe", "Zoey", "Penelope", "Layla",
@@ -24,7 +27,7 @@ namespace UberSideJobMod
             "Skylar", "Piper", "Paisley", "Ruby", "Eva", "Naomi", "Autumn"
         };
 
-                public static string[] LastNames = {
+        public static string[] LastNames = {
             "Smith", "Johnson", "Williams", "Jones", "Brown", "Davis", "Miller", "Wilson", "Moore", "Taylor",
             "Anderson", "Thomas", "Jackson", "White", "Harris", "Martin", "Thompson", "Garcia", "Martinez",
             "Robinson", "Clark", "Rodriguez", "Lewis", "Lee", "Walker", "Hall", "Allen", "Young", "King",
@@ -42,60 +45,75 @@ namespace UberSideJobMod
                     {"regular", new Dictionary<Gender, List<string>>
                         {
                             { Gender.Male, new List<string> {
-                        "Hey, man, how’s your day going?",
-                        "Good to see a fellow gent driving!",
-                        "Been busy today, dude?",
-                        "Nice weather we’re having, right?",
-                        "Thanks for the ride, bro!",
-                        "I take Uber every day—good gig, man?",
-                        "Just heading home from work, same as you?",
-                        "You been driving long today, pal?",
-                        "Traffic’s wild around here, huh, guy?",
-                        "You ever had any big shots in your car?",
-                        "This city’s got some crazy energy, man!",
-                        "Just running errands—boring stuff, dude.",
-                        "Know a good coffee spot, my man?",
-                        "My last driver got lost—you seem solid!",
-                        "Traffic’s a mess, but you’re handling it.",
-                        "I’m late for dinner—wife’s gonna kill me!",
-                        "Those food trucks downtown? Fire, man.",
-                        "This car’s comfier than my recliner!"
-                    }},
-                    { Gender.Female, new List<string> {
-                        "Hi, how’s your day going?",
-                        "Nice to have a lady behind the wheel!",
-                        "You keeping busy today?",
-                        "Isn’t the weather just lovely?",
-                        "Thanks for the ride!",
-                        "I’m an Uber regular—you enjoy driving?",
-                        "Heading home from work—long day?",
-                        "You been out here driving all day?",
-                        "Traffic’s always nuts here, right?",
-                        "Ever pick up anyone famous?",
-                        "This city’s got such a cool vibe!",
-                        "Just doing errands—nothing fun.",
-                        "Any favorite coffee places nearby?",
-                        "My last driver was hopeless—you’re great!",
-                        "Traffic’s awful, but you’re a pro.",
-                        "I’m late for dinner—hope it’s okay!",
-                        "You tried those downtown food trucks?",
-                        "This car’s so cozy, I love it!"
-                    }}
-                }},
-            {"flirty", new Dictionary<Gender, List<string>>
-                {
-                    { Gender.Male, new List<string> {
-                        "Hey there, handsome, how’s your day?",
-                        "Looking good behind the wheel, driver!",
-                        "Got any plans after this ride, cutie?",
-                        "You’re making my day better, stud!"
-                    }},
-                    { Gender.Female, new List<string> {
-                        "Hi, love, how’s your day going?",
-                        "You’re a charmer behind the wheel, dear!",
-                        "Free after this ride, sweetie?",
-                        "You’re brightening my day, gorgeous!"
-                    }}
+                                "Hey, man, how’s your day going?",
+                                "Good to see a fellow gent driving!",
+                                "Been busy today, dude?",
+                                "Nice weather we’re having, right?",
+                                "Thanks for the ride, bro!",
+                                "I take Uber every day—good gig, man?",
+                                "Just heading home from work, same as you?",
+                                "You been driving long today, pal?",
+                                "Traffic’s wild around here, huh?",
+                                "You ever had any big shots in your car?",
+                                "This city’s got some crazy energy, man!",
+                                "Just running errands—boring stuff, dude.",
+                                "Know a good coffee spot, my man?",
+                                "My last driver got lost—you seem solid!",
+                                "Traffic’s a mess, but you’re handling it.",
+                                "I’m late for dinner—!",
+                                "Those food trucks downtown? Fire, man.",
+                                "This car’s comfier than my recliner!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Hi, how’s your day going?",
+                                "Nice to have a lady behind the wheel!",
+                                "You keeping busy today?",
+                                "Isn’t the weather just lovely?",
+                                "Thanks for the ride!",
+                                "I’m an Uber regular—you enjoy driving?",
+                                "Heading home from work—long day?",
+                                "You been out here driving all day?",
+                                "Traffic’s always nuts here, right?",
+                                "Ever pick up anyone famous?",
+                                "This city’s got such a cool vibe!",
+                                "Just doing errands—nothing fun.",
+                                "Any favorite coffee places nearby?",
+                                "My last driver was hopeless—you’re great!",
+                                "Traffic’s awful, but you’re a pro.",
+                                "I’m late for dinner—hope it’s okay!",
+                                "You tried those downtown food trucks?",
+                                "This car’s so cozy, I love it!"
+                            }}
+                        }},
+                    {"dynamic", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Just came from the {0}, now heading to the {1}, man.",
+                                "Picked me up at the {0}, gotta get to the {1}—you good, dude?",
+                                "I was at the {0}, now off to the {1}—how’s the drive, bro?",
+                                "Leaving the {0} to check out the {1}—any shortcuts, pal?"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Just left the {0}, now going to the {1}, hon!",
+                                "From the {0} to the {1}—hope it’s a smooth ride, love.",
+                                "I was at the {0}, heading to the {1}—how’s traffic, dear?",
+                                "Leaving the {0} to visit the {1}—know a quick route, sweetie?"
+                            }}
+                        }},
+                    {"flirty", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Hey there, handsome, how’s your day?",
+                                "Looking good behind the wheel, driver!",
+                                "Got any plans after this ride, cutie?",
+                                "You’re making my day better, stud!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Hi, love, how’s your day going?",
+                                "You’re a charmer behind the wheel, dear!",
+                                "Free after this ride, sweetie?",
+                                "You’re brightening my day, gorgeous!"
+                            }}
                         }},
                     {"speeding", new Dictionary<Gender, List<string>>
                         {
@@ -121,7 +139,7 @@ namespace UberSideJobMod
                                 "Easy on the brakes, dude!",
                                 "My coffee’s everywhere, bro!",
                                 "That stop shook me up, pal!",
-                                "Warn me next time, guy!"
+                                "Warn me next time!"
                             }},
                             { Gender.Female, new List<string> {
                                 "Oh, love, that was sudden!",
@@ -155,7 +173,7 @@ namespace UberSideJobMod
                                 "You okay, dude? That was bad!",
                                 "That’s gonna hurt your rating, bro!",
                                 "Hope the car’s fine, pal!",
-                                "Bumper cars, huh, guy?"
+                                "Bumper cars, huh?"
                             }},
                             { Gender.Female, new List<string> {
                                 "Oh no, love, what was that?!",
@@ -167,63 +185,116 @@ namespace UberSideJobMod
                         }}
                 }
             },
+            // Other passenger types remain unchanged for brevity
             { PassengerType.Business, new Dictionary<string, Dictionary<Gender, List<string>>>
                 {
                     {"regular", new Dictionary<Gender, List<string>>
                         {
                             { Gender.Male, new List<string> {
-                        "Running late for a meeting, man.",
-                        "Can we speed up? Got a call soon.",
-                        "Know the fastest route, pal?",
-                        "Traffic’s brutal—always is, huh?",
-                        "Last driver was awful—better luck now.",
-                        "This deal’s make-or-break, bro.",
-                        "Side entrance, please—tight schedule.",
-                        "Three meetings today, exhausting.",
-                        "New office adds 20 minutes, ugh.",
-                        "Gonna send emails—cool, dude?",
-                        "Boss is on my case, as usual.",
-                        "Corporate life’s rough, you know?",
-                        "No time for coffee—sucks, man.",
-                        "This deal’s huge—fingers crossed!",
-                        "Pitching investors—big day, pal.",
-                        "Any Midtown shortcuts, bro?",
-                        "Assistant booked you—hope you’re good.",
-                        "Last quarter tanked—here’s hoping."
-                    }},
-                    { Gender.Female, new List<string> {
-                        "I’m late for a meeting.",
-                        "Can we hurry? Conference call soon.",
-                        "Fastest route, please?",
-                        "Traffic never improves, does it?",
-                        "My last driver was hopeless—trusting you.",
-                        "This presentation’s critical.",
-                        "Drop me at the side, please—running late.",
-                        "Back-to-back meetings today, ugh.",
-                        "New office is so far—hate it.",
-                        "Mind if I send emails?",
-                        "My boss won’t let up today.",
-                        "Ever deal with execs? Tough, right?",
-                        "Dying for coffee but no time.",
-                        "Huge deal today—wish me luck!",
-                        "Investor pitch—can’t be late.",
-                        "Know shortcuts to Midtown?",
-                        "My assistant picked you—don’t let me down.",
-                        "Rough quarter—hoping for better."
-                    }}
-                }},
-            {"flirty", new Dictionary<Gender, List<string>>
-                {
-                    { Gender.Male, new List<string> {
-                        "Looking sharp, driver—big plans later?",
-                        "Handsome and a good driver? Impressive!",
-                        "You’re making this ride enjoyable, sir!"
-                    }},
-                    { Gender.Female, new List<string> {
-                        "You look lovely today, driver!",
-                        "Charming and skilled—nice combo, dear!",
-                        "This ride’s better with you, sweetie!"
-                    }}
+                                "Running late for a meeting, man.",
+                                "Can we speed up? Got a call soon.",
+                                "Know the fastest route, pal?",
+                                "Traffic’s brutal—always is, huh?",
+                                "Last driver was awful—better luck now.",
+                                "This deal’s make-or-break, bro.",
+                                "Side entrance, please—tight schedule.",
+                                "Three meetings today, exhausting.",
+                                "New office adds 20 minutes, ugh.",
+                                "Gonna send emails—cool, dude?",
+                                "Boss is on my case, as usual.",
+                                "Corporate life’s rough, you know?",
+                                "No time for coffee—sucks, man.",
+                                "This deal’s huge—fingers crossed!",
+                                "Pitching investors—big day, pal.",
+                                "Any Midtown shortcuts, bro?",
+                                "Assistant booked you—hope you’re good.",
+                                "Last quarter tanked—here’s hoping."
+                            }},
+                            { Gender.Female, new List<string> {
+                                "I’m late for a meeting.",
+                                "Can we hurry? Conference call soon.",
+                                "Fastest route, please?",
+                                "Traffic never improves, does it?",
+                                "My last driver was hopeless—trusting you.",
+                                "This presentation’s critical.",
+                                "Drop me at the side, please—running late.",
+                                "Back-to-back meetings today, ugh.",
+                                "New office is so far—hate it.",
+                                "Mind if I send emails?",
+                                "My boss won’t let up today.",
+                                "Ever deal with execs? Tough, right?",
+                                "Dying for coffee but no time.",
+                                "Huge deal today—wish me luck!",
+                                "Investor pitch—can’t be late.",
+                                "Know shortcuts to Midtown?",
+                                "My assistant picked you—don’t let me down.",
+                                "Rough quarter—hoping for better."
+                            }}
+                        }},
+                    {"dynamic_day", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Coming from the {0}, got a meeting at the {1}—can’t be late.",
+                                "Left the {0}, need to hit the {1} for a deal.",
+                                "From the {0} to the {1}—fastest route, pal?",
+                                "Was at the {0}, heading to the {1} for a big pitch, bro."
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Left the {0}, need to reach the {1} for a deal.",
+                                "From the {0} to the {1}—quick way, please?",
+                                "Got a pitch at the {1}, was at the {0}—fastest route?",
+                                "Coming from the {0}, off to the {1}—tight schedule."
+                            }}
+                        }},
+                    {"dynamic_day_same_type", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Met a client at the {0}, now another meeting at the {0}—hurry!",
+                                "Busy day at the {0}—another deal to close, pal.",
+                                "From one {0} meeting to the next—keep it quick, dude!",
+                                "Handling two cases at the {0} today—fastest route, bro!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Leaving the {0}, now another meeting at the {0}—hurry, please.",
+                                "Met a client at the {0}, now another meeting at the {0}—hurry, hon!",
+                                "Busy day at the {0}—another deal to close, dear.",
+                                "From one {0} meeting to the next—keep it quick!",
+                                "Handling two cases at the {0} today—fastest route, sweetie!"
+                            }}
+                        }},
+                    {"dynamic_night", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Entertaining clients at the {0}, now to the {1}—keep it quick, man.",
+                                "Late visit to the {0}, heading to the {1}—urgent stuff, dude.",
+                                "Was at the {0}, need to check the {1}—no delays, bro.",
+                                "From the {0} to the Residential for a late client call, pal.",
+                                "Left the {0}, heading home to the Residential—urgent docs, dude.",
+                                "Residential to the {1} after a long day—final emails, man.",
+                                "From the Residential to the {1}—late-night prep, bro."
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Client drinks at the {0}, now to the {1}—hurry, ma'am!.",
+                                "Checking the {0} late, off to the {1}—important, hon.",
+                                "Left the {0}, heading to the {1}—can’t wait, sweetie.",
+                                "From the {0} to the Residential for a late client call.",
+                                "Left the {0}, heading home to the Residential—urgent docs, hon.",
+                                "Residential to the {1} after a long day—final emails, dear.",
+                                "From the Residential to the {1}—late-night prep, sweetie."
+                            }}
+                        }},
+                    {"flirty", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Looking sharp, driver—big plans later?",
+                                "Handsome and a good driver? Impressive!",
+                                "You’re making this ride enjoyable, sir!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "You look lovely today, driver!",
+                                "Charming and skilled—nice combo, dear!",
+                                "This ride’s better with you, sweetie!"
+                            }}
                         }},
                     {"speeding", new Dictionary<Gender, List<string>>
                         {
@@ -300,58 +371,73 @@ namespace UberSideJobMod
                     {"regular", new Dictionary<Gender, List<string>>
                         {
                             { Gender.Male, new List<string> {
-                        "First time here, man—any tips, amigo?",
-                        "Best eats around, dude, mon ami?",
-                        "How long you driven here, bro?",
-                        "These buildings are wild, vraiment!",
-                        "City’s nuts compared to home, यार.",
-                        "Got BBQ spots, man, compañero?",
-                        "Tacos here legit, bro—verdad?",
-                        "Here for the weekend, tryna see it all!",
-                        "Hot as hell out here, dude, ね？",
-                        "No skyscrapers like this back home!",
-                        "Museums worth it, man, arigatou?",
-                        "This place is dope, bro, danke!",
-                        "Nightlife tips, dude, por favor?",
-                        "Snapping pics for my blog, man!",
-                        "Food carts look sick, bro, amico!",
-                        "GPS is trash—glad you got this!",
-                        "Feels like a movie, man, incroyable!",
-                        "You ever bored driving, dude?"
-                    }},
-                    { Gender.Female, new List<string> {
-                        "First visit—any must-sees, amiga?",
-                        "Where’s good food, mon amie?",
-                        "You driven long here, señora?",
-                        "Love the architecture, vraiment!",
-                        "So different from home, यार.",
-                        "Any BBQ places, compañera?",
-                        "Heard the tacos rock—verdad?",
-                        "Just a weekend trip—wanna see it all!",
-                        "Super warm out here, ね？",
-                        "My town’s got nothing this tall!",
-                        "Good museums, arigatou?",
-                        "This city’s amazing, danke!",
-                        "Know cool nightlife, por favor?",
-                        "Getting pics for my blog!",
-                        "Those food carts—yum, amica!",
-                        "I’d be lost without you!",
-                        "Like a film set, incroyable!",
-                        "Driving here fun, or tiring?"
-                    }}
-                }},
-            {"flirty", new Dictionary<Gender, List<string>>
-                {
-                    { Gender.Male, new List<string> {
-                        "Hey, handsome, show me the city?",
-                        "You’re my favorite tour guide, cutie!",
-                        "This trip’s better with you, stud!"
-                    }},
-                    { Gender.Female, new List<string> {
-                        "Hi, gorgeous, know the best spots?",
-                        "My fave tour guide, sweetie!",
-                        "You’re making this trip amazing, dear!"
-                    }}
+                                "First time here, man—any tips?",
+                                "Best eats around, dude?",
+                                "How long you driven here, bro?",
+                                "These buildings are wild!",
+                                "City’s nuts compared to home.",
+                                "Got BBQ spots, man",
+                                "Tacos here legit?",
+                                "Here for the weekend, tryna see it all!",
+                                "Hot as hell out here, dude",
+                                "No skyscrapers like this back home!",
+                                "Museums worth it",
+                                "This place is dope!",
+                                "Nightlife tips, dude?",
+                                "Snapping pics for my blog!",
+                                "Food carts look sick, bro!",
+                                "GPS is trash—glad you got this!",
+                                "Feels like a movie, man!",
+                                "You ever bored driving?"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "First visit—any must-sees?",
+                                "Where’s good food, mon amie?",
+                                "You driven long here?",
+                                "Love the architecture!",
+                                "So different from home.",
+                                "Any BBQ places?",
+                                "Heard the tacos?",
+                                "Just a weekend trip—wanna see it all!",
+                                "Super warm out here",
+                                "My town’s got nothing this tall!",
+                                "Good museums, arigatou?",
+                                "This city’s amazing",
+                                "Know cool nightlife",
+                                "Getting pics for my blog!",
+                                "Those food carts—yum!",
+                                "I’d be lost without you!",
+                                "Like a film set!",
+                                "Driving here fun, or tiring?"
+                            }}
+                        }},
+                    {"dynamic", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "The {0} was unreal—first time seeing a place like that, man!",
+                                "Checked out the {0}, now to the {1}—this city’s wild, dude!",
+                                "Man, the {0} blew my mind, heading to the {1}—any tips, bro?",
+                                "Never seen a {0} like that, off to the {1}—loving this trip, pal!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "The {0} was amazing—nothing like that back home, hon!",
+                                "Visited the {0}, now going to the {1}—this place is incredible, love!",
+                                "Wow, the {0} was so cool, heading to the {1}—any suggestions, dear?",
+                                "First time at a {0} like that, off to the {1}—best trip ever, sweetie!"
+                            }}
+                        }},
+                    {"flirty", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Hey, handsome, show me the city?",
+                                "You’re my favorite tour guide, cutie!",
+                                "This trip’s better with you, stud!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Hi, gorgeous, know the best spots?",
+                                "My fave tour guide, sweetie!",
+                                "You’re making this trip amazing, dear!"
+                            }}
                         }},
                     {"speeding", new Dictionary<Gender, List<string>>
                         {
@@ -428,58 +514,88 @@ namespace UberSideJobMod
                     {"regular", new Dictionary<Gender, List<string>>
                         {
                             { Gender.Male, new List<string> {
-                        "Let’s kick this off, bro!",
-                        "Ready for a wild ride, man?",
-                        "Yo, dude, got an aux cord?",
-                        "Hitting clubs—any spots, pal?",
-                        "This ride’s our pregame, bro!",
-                        "Crank the music, man!",
-                        "City’s crazy—you party, dude?",
-                        "Late for VIP, let’s roll!",
-                        "This car’s got vibes, bro!",
-                        "Seen wild nights, right, pal?",
-                        "Headed to the hottest club, man!",
-                        "Join us after, dude?",
-                        "Keep the energy high, bro!",
-                        "Got snacks in here, man?",
-                        "Hurry so we can dance, pal!",
-                        "Where’s the afterparty, dude?",
-                        "You’re our VIP driver, bro!",
-                        "Hope you’re cool with loud, man!"
-                    }},
-                    { Gender.Female, new List<string> {
-                        "Party time, let’s go!",
-                        "Gonna be a fun ride?",
-                        "Hey, where’s the aux?",
-                        "Clubs tonight—any faves?",
-                        "This ride’s our warm-up!",
-                        "Blast some tunes!",
-                        "This city’s lit—you party?",
-                        "We’re late for VIP—floor it!",
-                        "This car’s giving vibes!",
-                        "Bet you’ve seen epic nights!",
-                        "Off to the best club!",
-                        "Come hang after?",
-                        "Match our vibe—upbeat!",
-                        "Any snacks here?",
-                        "Get us there quick to dance!",
-                        "Know the afterparty spot?",
-                        "Our VIP driver, right?",
-                        "Hope you’re down for loud!"
-                    }}
-                }},
-            {"flirty", new Dictionary<Gender, List<string>>
-                {
-                    { Gender.Male, new List<string> {
-                        "Hey, hon, let’s make this fun!",
-                        "Looking cool, driver—party with us?",
-                        "You’re turning up my night, babe!"
-                    }},
-                    { Gender.Female, new List<string> {
-                        "Hey, hon, let’s make this fun!",
-                        "Looking cool, driver—party with us?",
-                        "You’re turning up my night, babe!"
-                    }}
+                                "Let’s kick this off, bro!",
+                                "Ready for a wild ride, man?",
+                                "Yo, dude, got an aux cord?",
+                                "Hitting clubs—any spots, pal?",
+                                "This ride’s our pregame, bro!",
+                                "Crank the music, man!",
+                                "City’s crazy—you party, dude?",
+                                "Late for VIP, let’s roll!",
+                                "This car’s got vibes, bro!",
+                                "Seen wild nights, right, pal?",
+                                "Headed to the hottest club, man!",
+                                "Join us after, dude?",
+                                "Keep the energy high, bro!",
+                                "Got snacks in here, man?",
+                                "Hurry so we can dance, pal!",
+                                "Where’s the afterparty, dude?",
+                                "You’re our VIP driver, bro!",
+                                "Hope you’re cool with loud, man!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Party time, let’s go!",
+                                "Gonna be a fun ride?",
+                                "Hey, where’s the aux?",
+                                "Clubs tonight—any faves?",
+                                "This ride’s our warm-up!",
+                                "Blast some tunes!",
+                                "This city’s lit—you party?",
+                                "We’re late for VIP—floor it!",
+                                "This car’s giving vibes!",
+                                "Bet you’ve seen epic nights!",
+                                "Off to the best club!",
+                                "Come hang after?",
+                                "Match our vibe—upbeat!",
+                                "Any snacks here?",
+                                "Get us there quick to dance!",
+                                "Know the afterparty spot?",
+                                "Our VIP driver, right?",
+                                "Hope you’re down for loud!"
+                            }}
+                        }},
+                    {"dynamic", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Just left the {0}, hitting the {1}—keep it lit, bro!",
+                                "From the {0} to the {1}—crank the tunes, man!",
+                                "Coming from the {0}, off to the {1}—VIP vibes, dude!",
+                                "Party at the {0} was wild, now to the {1}—fast, pal!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Dancing at the {0}, now to the {1}—keep it fun, hon!",
+                                "Left the {0}, heading to the {1}—music up, love!",
+                                "From the {0} to the {1}—feeling epic, dear!",
+                                "{0} was awesome, off to the {1}—hurry, sweetie!"
+                            }}
+                        }},
+                    {"dynamic_same_type", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Back to the {0} for round two—turn it up, bro!",
+                                "Nightclub again—let’s keep the party rolling, dude!",
+                                "Same {0}, new energy—crank it, man!",
+                                "Round two at the {0}—keep it lit, pal!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Back to the {0} for more—keep it fun, hon!",
+                                "Another {0} night—let’s dance again, love!",
+                                "Same {0}, more vibes—turn it up, dear!",
+                                "Round two at the {0}—so exciting, sweetie!"
+                            }}
+                        }},
+                    {"flirty", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "Hey, hon, let’s make this fun!",
+                                "Looking cool, driver—party with us?",
+                                "You’re turning up my night, babe!"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "Hey, hon, let’s make this fun!",
+                                "Looking cool, driver—party with us?",
+                                "You’re turning up my night, babe!"
+                            }}
                         }},
                     {"speeding", new Dictionary<Gender, List<string>>
                         {
@@ -554,29 +670,44 @@ namespace UberSideJobMod
             { PassengerType.Silent, new Dictionary<string, Dictionary<Gender, List<string>>>
                 {
                     {"regular", new Dictionary<Gender, List<string>>
-                {
-                    { Gender.Male, new List<string> {
-                        "...",
-                        "*looks out window*",
-                        "*checks phone*",
-                        "*nods at the guy*",
-                        "*shifts bag*",
-                        "*quiet sigh*"
-                    }},
-                    { Gender.Female, new List<string> {
-                        "...",
-                        "*stares out window*",
-                        "*glances at phone*",
-                        "*nods at the lady*",
-                        "*adjusts bag*",
-                        "*soft sigh*"
-                    }}
-                }},
-            {"flirty", new Dictionary<Gender, List<string>>
-                {
-                    { Gender.Male, new List<string> {}},
-                    { Gender.Female, new List<string> {}}
-                }},
+                        {
+                            { Gender.Male, new List<string> {
+                                "...",
+                                "*looks out window*",
+                                "*checks phone*",
+                                "*nods at the guy*",
+                                "*shifts bag*",
+                                "*quiet sigh*"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "...",
+                                "*stares out window*",
+                                "*glances at phone*",
+                                "*nods at the lady*",
+                                "*adjusts bag*",
+                                "*soft sigh*"
+                            }}
+                        }},
+                    {"dynamic", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {
+                                "*nods from the {0}*",
+                                "*glances toward the {1}*",
+                                "*sighs, leaving the {0}*",
+                                "*quiet look at the {1}*"
+                            }},
+                            { Gender.Female, new List<string> {
+                                "*nods from the {0}*",
+                                "*eyes the {1}*",
+                                "*sighs, from the {0}*",
+                                "*calm glance at the {1}*"
+                            }}
+                        }},
+                    {"flirty", new Dictionary<Gender, List<string>>
+                        {
+                            { Gender.Male, new List<string> {}},
+                            { Gender.Female, new List<string> {}}
+                        }},
                     {"speeding", new Dictionary<Gender, List<string>>
                         {
                             { Gender.Male, new List<string> {
@@ -615,7 +746,7 @@ namespace UberSideJobMod
                         {
                             { Gender.Male, new List<string> {
                                 "*nods at the guy*",
-                                "*relaxes a bit*",
+                                "relaxes a bit*",
                                 "*slight smile*",
                                 "*sits easy*",
                                 "*calm look*"
@@ -638,8 +769,8 @@ namespace UberSideJobMod
                                 "*stares coldly*"
                             }},
                             { Gender.Female, new List<string> {
-                                "*glares at the lady*",
                                 "Not again, please.",
+                                "*glares at the lady*",
                                 "*grumbles*",
                                 "*shakes head*",
                                 "*icy stare*"
@@ -648,5 +779,19 @@ namespace UberSideJobMod
                 }
             }
         };
+
+        public static string GetRandomComment(PassengerType passengerType, string commentType, Gender playerGender)
+        {
+            if (!Comments.ContainsKey(passengerType) ||
+                !Comments[passengerType].ContainsKey(commentType) ||
+                !Comments[passengerType][commentType].ContainsKey(playerGender))
+            {
+                return string.Empty;
+            }
+            var comments = Comments[passengerType][commentType][playerGender];
+            if (comments.Count == 0) return string.Empty;
+            string key = $"passenger_{passengerType}_{commentType}_{playerGender}";
+            return comments[ConversationTracker.GetRandomLineIndex(comments, key)];
+        }
     }
 }

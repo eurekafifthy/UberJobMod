@@ -40,5 +40,6 @@ namespace UberSideJobMod
         public int positiveInteractions { get; set; } = 0;
         public int negativeInteractions { get; set; } = 0;
         public bool hadSpecialConversation { get; set; } = false;
+        public int dynamicLineCount;
     }
 }

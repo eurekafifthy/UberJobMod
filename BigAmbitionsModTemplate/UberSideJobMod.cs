@@ -15,16 +15,24 @@ using Il2CppVehicles.VehicleTypes;
 using Il2CppEnums;
 using Newtonsoft.Json;
 using UberSideJobMod.UberSideJobMod;
+using UnityEngine.EventSystems;
 
 namespace UberSideJobMod
 {
     public class UberJobMod : MelonMod
     {
         #region Fields
+        // Queue system 
+        private Queue<UberPassenger> passengerPool;
+        private const float MaxPoolTime = 60f;
 
         // Constants
-        private const float CheckDistance = 75f;
-        private const float PickupConfirmTime = 0.05f;
+        private float sessionStartTime = 0f;
+        private float lastCollisionDebounceTime = 0f;
+        private float speedingTimer = 0f;
+        private bool wasSpeeding = false;
+        private const float CheckDistance = 30f;
+        private const float PickupConfirmTime = 0.15f;
         private float timeSinceLastOutsideZone = 0f;
         private const float PassengerOfferInterval = 30f;
         private const float UberJobCooldown = 120f;
@@ -35,7 +43,6 @@ namespace UberSideJobMod
         private const float SmoothAccelerationThreshold = 15f;
         private const float PeakMultiplier = 1.5f;
         private const float SuddenStopCooldownDuration = 10f;
-        private const float SpeedingNotificationCooldown = 25f;
         private bool isCompletingJob = false;
 
         // Tips System
@@ -44,86 +51,6 @@ namespace UberSideJobMod
         private readonly float tipMultiplierForBadDriving = 0.5f;
         private readonly Dictionary<PassengerType, float> passengerTypeTipRates = new Dictionary<PassengerType, float>();
         private readonly Dictionary<string, float> neighborhoodTipRates = new Dictionary<string, float>();
-
-        // Notification Messages
-        private readonly Dictionary<PassengerType, Dictionary<string, List<string>>> notificationMessages = new Dictionary<PassengerType, Dictionary<string, List<string>>>
-        {
-            [PassengerType.Business] = new Dictionary<string, List<string>>
-            {
-                ["speeding"] = new List<string>
-                {
-                    "{playerName}, I’m on a tight schedule—can you slow down?",
-                    "{playerName}, this speed is unprofessional, please ease up!",
-                    "{playerName}, slow down, I’d like to arrive in one piece!"
-                },
-                ["sudden_stop"] = new List<string>
-                {
-                    "{playerName}, that stop was abrupt—fortunately, I’m belted in!",
-                    "{playerName}, please, no more sudden stops, I have a meeting!",
-                    "{playerName}, a smoother ride would be much appreciated!"
-                }
-            },
-            [PassengerType.Tourist] = new Dictionary<string, List<string>>
-            {
-                ["speeding"] = new List<string>
-                {
-                    "{playerName}, whoa, slow down—I want to enjoy the sights!",
-                    "{playerName}, can you ease up? I’m here to explore, not race!",
-                    "{playerName}, slow down, I’d love to take some photos!"
-                },
-                ["sudden_stop"] = new List<string>
-                {
-                    "{playerName}, that stop startled me—good thing I’m buckled up!",
-                    "{playerName}, oh my, let’s avoid those sudden stops, okay?",
-                    "{playerName}, that was a jolt—let’s keep it smooth, please!"
-                }
-            },
-            [PassengerType.Party] = new Dictionary<string, List<string>>
-            {
-                ["speeding"] = new List<string>
-                {
-                    "{playerName}, yo, slow down—we’re not at the club yet!",
-                    "{playerName}, chill on the speed, let’s keep the vibes cool!",
-                    "{playerName}, ease up, I don’t wanna spill my drink!"
-                },
-                ["sudden_stop"] = new List<string>
-                {
-                    "{playerName}, whoa, that stop—luckily I’m strapped in!",
-                    "{playerName}, easy on the brakes, let’s keep the party going!",
-                    "{playerName}, that stop killed the vibe—smoother, please!"
-                }
-            },
-            [PassengerType.Silent] = new Dictionary<string, List<string>>
-            {
-                ["speeding"] = new List<string>
-                {
-                    "{playerName}, *sighs* Can you slow down?",
-                    "{playerName}, *frowns* Please, less speed.",
-                    "{playerName}, *quietly* Slow down, okay?"
-                },
-                ["sudden_stop"] = new List<string>
-                {
-                    "{playerName}, *grips seat* I’m belted, but still…",
-                    "{playerName}, *mutters* That stop was harsh.",
-                    "{playerName}, *silent glare* Smoother, please."
-                }
-            },
-            [PassengerType.Regular] = new Dictionary<string, List<string>>
-            {
-                ["speeding"] = new List<string>
-                {
-                    "{playerName}, can you slow down a bit, please?",
-                    "{playerName}, let’s take it easy on the speed, okay?",
-                    "{playerName}, slow down, I’m not in a rush!"
-                },
-                ["sudden_stop"] = new List<string>
-                {
-                    "{playerName}, that stop was rough—good thing I’m buckled!",
-                    "{playerName}, let’s keep it smooth, that stop was jarring!",
-                    "{playerName}, whoa, easy on the brakes, please!"
-                }
-            }
-        };
 
         // Core State
         private bool uberJobActive = false;
@@ -174,12 +101,17 @@ namespace UberSideJobMod
         private float lastJobCompletionTime = -UberJobCooldown;
         private float lastConversationTime = 0f;
 
-        // UI and Conversation State
+        // Passenger Logic
+        private BussinesTypeNamePool businessTypePool = new BussinesTypeNamePool();
+        private DrivingStateDialogues drivingDialogues;
         private bool conversationShown = false;
         private bool ratingPending = false;
         private bool hadRegularConversation = false;
         private int conversationCount = 0;
         private bool isPeakHours = false;
+        private System.Random conversationRandom = new System.Random();
+        private bool hasShownVehicleComment = false;
+        private bool hasQueuedSpecialTouristComment = false;
 
         // Player State
         private Gender playerGender;
@@ -189,22 +121,21 @@ namespace UberSideJobMod
         #endregion
 
         #region Initialization
-
         public override void OnInitializeMelon()
         {
+            passengerPool = new Queue<UberPassenger>();
             MelonLogger.Msg("Uber Mod Big Ambitions - loaded successfully!");
-            InitializeComponents();
             LoadDriverStats();
             InitializeTipSystem();
             MelonCoroutines.Start(WaitForGameLoad());
+            drivingDialogues = new DrivingStateDialogues();
         }
 
         private void InitializeComponents()
         {
             uiManager = new UberUIManager();
             uiManager.InitializeUI();
-            uiManager.OnAcceptClicked += OnAcceptButtonClicked;
-            uiManager.OnDeclineClicked += OnDeclineButtonClicked;
+            uiManager.OnAcceptPassenger += OnAcceptPassenger;
             uiManager.OnCancelClicked += OnCancelButtonClicked;
             uiManager.SetUIVisible(false);
 
@@ -253,8 +184,13 @@ namespace UberSideJobMod
                 yield return new WaitForSeconds(0.5f);
             }
 
-            yield return LoadPlayerCharacterData();
+            while (GameObject.FindObjectOfType<EventSystem>() == null)
+            {
+                MelonLogger.Warning("EventSystem not yet available, waiting...");
+                yield return new WaitForSeconds(0.5f);
+            }
 
+            yield return LoadPlayerCharacterData();
             LoadAddressData();
 
             if (addresses.Count == 0)
@@ -262,6 +198,8 @@ namespace UberSideJobMod
                 yield return new WaitForSeconds(10f);
                 LoadAddressData();
             }
+
+            InitializeComponents();
 
             MelonCoroutines.Start(EfficientUberJobRoutine());
             MelonCoroutines.Start(TimeCheckRoutine());
@@ -453,11 +391,9 @@ namespace UberSideJobMod
                 driverStats = new DriverStats();
             }
         }
-
         #endregion
 
         #region Coroutines
-
         private IEnumerator EfficientUberJobRoutine()
         {
             float idleTimeWithoutJob = 0f;
@@ -466,43 +402,62 @@ namespace UberSideJobMod
             while (true)
             {
                 float waitTime = uberJobActive ? 0.5f : 1f;
+                bool shouldContinue = false;
 
                 if (showUberUI || uberJobActive)
                 {
-                    UpdateNeighborhood();
-                    VehicleController playerVehicle = GetPlayerVehicle();
-
-                    if (isCompletingJob)
+                    try
                     {
-                        yield return new WaitForSeconds(waitTime);
-                        continue;
-                    }
+                        UpdateNeighborhood();
+                        VehicleController playerVehicle = GetPlayerVehicle();
 
-                    if (playerVehicle != null && showUberUI && !uberJobActive && currentPassenger == null)
-                    {
-                        idleTimeWithoutJob += waitTime;
-                        if (Time.time - lastJobCompletionTime > UberJobCooldown &&
-                            (Time.time - lastPassengerOfferTime > PassengerOfferInterval || idleTimeWithoutJob > 45f))
+                        if (isCompletingJob)
                         {
-                            OfferNewPassenger();
-                            lastPassengerOfferTime = Time.time;
-                            idleTimeWithoutJob = 0f;
+                            shouldContinue = true;
                         }
-                    }
-                    else
-                    {
-                        idleTimeWithoutJob = 0f;
-                    }
-
-                    if (uberJobActive && currentPassenger != null)
-                    {
-                        if (currentPassenger != null && currentPassenger.isPickedUp && !conversationShown && Time.time - lastConversationTime > ConversationInterval)
+                        else if (!uberJobActive)
                         {
-                            ShowPassengerConversation();
-                            lastConversationTime = Time.time;
-                        }
+                            if (passengerPool == null)
+                            {
+                                passengerPool = new Queue<UberPassenger>();
+                            }
 
-                        if (currentPassenger != null && !currentPassenger.isPickedUp)
+                            Queue<UberPassenger> tempQueue = new Queue<UberPassenger>();
+                            int originalCount = passengerPool.Count;
+
+                            for (int i = 0; i < originalCount; i++)
+                            {
+                                if (passengerPool.Count == 0)
+                                {
+                                    break;
+                                }
+
+                                UberPassenger passenger = passengerPool.Dequeue();
+                                if (passenger == null)
+                                {
+                                    continue;
+                                }
+
+                                passenger.waitTime += waitTime;
+
+                                if (passenger.waitTime <= MaxPoolTime)
+                                {
+                                    tempQueue.Enqueue(passenger);
+                                }
+                                else
+                                {
+                                    string passengerName = passenger.passengerName ?? "Unknown Passenger";
+                                }
+                            }
+                            passengerPool = tempQueue;
+
+                            if (passengerPool.Count < 5 && Time.time - lastPassengerOfferTime > PassengerOfferInterval)
+                            {
+                                GenerateNewPassengerForPool();
+                                lastPassengerOfferTime = Time.time;
+                            }
+                        }
+                        else if (currentPassenger != null && !currentPassenger.isPickedUp)
                         {
                             currentPassenger.waitTime += waitTime;
                             if (currentPassenger.waitTime > MaxWaitingTime && UnityEngine.Random.Range(0, 100) < 5)
@@ -511,28 +466,41 @@ namespace UberSideJobMod
                             }
                         }
 
-                        if (playerVehicle != null)
+                        if (uberJobActive && currentPassenger != null)
                         {
-                            CheckDestinationReached(playerVehicle);
-                        }
-                        else
-                        {
-                        }
+                            if (!currentPassenger.isPickedUp)
+                            {
+                                Il2CppNWH.VehiclePhysics2.Damage.DamageHandler damageHandler = playerVehicle.GetComponent<Il2CppNWH.VehiclePhysics2.Damage.DamageHandler>();
+                                HandlePickup(playerVehicle, damageHandler);
+                            }
+                            else
+                            {
+                                HandleDropoff(playerVehicle);
+                                if (currentPassenger != null && currentPassenger.isPickedUp && !conversationShown && Time.time - lastConversationTime > ConversationInterval)
+                                {
+                                    ShowPassengerConversation();
+                                    lastConversationTime = Time.time;
+                                }
+                            }
 
-                        if (currentPassenger != null && currentPassenger.isPickedUp && Time.time - lastDrivingStateUpdate >= 0.2f)
-                        {
-                            if (playerVehicle != null)
+                            if (playerVehicle != null && currentPassenger != null && currentPassenger.isPickedUp && Time.time - lastDrivingStateUpdate >= 0.2f)
                             {
                                 UpdateDrivingState(playerVehicle);
                                 lastDrivingStateUpdate = Time.time;
                             }
-                            else
-                            {
-                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"Error in EfficientUberJobRoutine: {ex.Message}\nStack: {ex.StackTrace}");
                     }
                 }
 
+                if (shouldContinue)
+                {
+                    yield return new WaitForSeconds(waitTime);
+                    continue;
+                }
                 yield return new WaitForSeconds(waitTime);
             }
         }
@@ -558,9 +526,9 @@ namespace UberSideJobMod
             }
         }
 
-        private IEnumerator ResetConversationFlag()
+        private System.Collections.IEnumerator ResetConversationFlag()
         {
-            yield return new WaitForSeconds(10f);
+            yield return new WaitForSeconds(15f);
             conversationShown = false;
         }
 
@@ -586,7 +554,7 @@ namespace UberSideJobMod
                 feedbackReasons.Add("sudden stops");
             }
 
-            if (passenger.totalSpeedingTime > 30f && (!isCheapCar || maxVehicleSpeed > dynamicSpeedLimit * 1.3f))
+            if (passenger.totalSpeedingTime > 620f && (!isCheapCar || maxVehicleSpeed > dynamicSpeedLimit * 1.3f))
             {
                 float speedDeduction = Mathf.Min(0.3f, passenger.totalSpeedingTime / 100f) * (isCheapCar ? 0.5f : 1f);
                 ratingDeduction += speedDeduction;
@@ -613,13 +581,16 @@ namespace UberSideJobMod
                 finalRating = Mathf.Min(finalRating, 2.5f);
             }
 
-            string feedbackMessage = feedbackReasons.Count == 1 ? $"Because of {feedbackReasons[0]}." :
-                                    feedbackReasons.Count > 1 ? $"Because of {string.Join(", ", feedbackReasons.Take(feedbackReasons.Count - 1))} and {feedbackReasons.Last()}." : "";
+            string feedbackMessage = feedbackReasons.Count == 1
+            ? $"Because of <color=yellow>{feedbackReasons[0]}</color>."
+            : feedbackReasons.Count > 1
+                ? $"Because of <color=yellow>{string.Join("</color>, <color=yellow>", feedbackReasons.Take(feedbackReasons.Count - 1))}</color> and <color=yellow>{feedbackReasons.Last()}</color>."
+                : "";
 
             driverStats.ratings.Add(finalRating);
             driverStats.averageRating = driverStats.ratings.Average();
 
-            string notificationMessage = $"{passenger.passengerName} rated you {finalRating:F1} stars!" +
+            string notificationMessage = $"{passenger.passengerName} rated you {finalRating:F1} ★" +
                                         (string.IsNullOrEmpty(feedbackMessage) ? "" : $"\n{feedbackMessage}");
             NotificationType notificationType = finalRating >= 4f ? NotificationType.Success :
                                                finalRating >= 3f ? NotificationType.Info :
@@ -635,31 +606,50 @@ namespace UberSideJobMod
         {
             yield return new WaitForSeconds(delay);
             showUberUI = false;
+            uiManager.SetUIVisible(false);
         }
 
-        private IEnumerator ShowSpecialTouristConversation()
+        private System.Collections.IEnumerator ShowSpecialTouristConversation()
         {
-            yield return new WaitForSeconds(8f);
+            yield return new WaitForSeconds(1f);
 
-            if (currentPassenger != null && currentPassenger.isPickedUp && currentPassenger.passengerType == PassengerType.Tourist)
+            List<string> touristCommentsMale = new List<string>
             {
-                string touristQuestion = $"Hey, what's the best place to visit in {currentNeighborhood}? I'm new here!";
-                ShowNotification($"{currentPassenger.passengerName}: \"{touristQuestion}\"", NotificationType.Info, 15f);
-                currentPassenger.hadSpecialConversation = true;
-                currentPassenger.positiveInteractions++;
-            }
-        }
+                "Tacos here legit?",
+                "Any cool spots for photos, dude?",
+                "This city’s wild, man—any hidden gems?",
+                "Where’s the best coffee around here, pal?",
+                "Got any local festival tips, bro?"
+            };
 
+            List<string> touristCommentsFemale = new List<string>
+            {
+                "Tacos here legit?",
+                "Where can I snap some cute pics, hon?",
+                "This place is amazing—any secret spots, dear?",
+                "Best place for a coffee date, amiga?",
+                "Any fun local events coming up, love?"
+            };
+
+            var commentList = playerGender == Gender.Male ? touristCommentsMale : touristCommentsFemale;
+            string key = $"tourist_special_{playerGender}";
+            string comment = commentList[ConversationTracker.GetRandomLineIndex(commentList, key)];
+
+            ShowNotification($"{currentPassenger.passengerName}: \"{comment}\"", NotificationType.Info, 15f);
+            currentPassenger.hadSpecialConversation = true;
+            conversationShown = true;
+            conversationCount++;
+
+            MelonCoroutines.Start(ResetConversationFlag());
+        }
         #endregion
 
         #region Event Handlers
-
         public override void OnUpdate()
         {
             if (uiManager == null)
             {
-                MelonLogger.Warning("uiManager is null in OnUpdate, initializing...");
-                InitializeComponents();
+                return;
             }
 
             if (uberJobActive && currentPassenger != null)
@@ -670,7 +660,7 @@ namespace UberSideJobMod
             if (showUberUI)
             {
                 UpdateUITitle();
-                uiManager.UpdateUI(driverStats, currentPassenger, isPeakHours, uberJobActive);
+                uiManager.UpdateUI(driverStats, currentPassenger, passengerPool, isPeakHours, uberJobActive);
             }
 
             if (Input.GetKeyDown(KeyCode.F3))
@@ -704,42 +694,37 @@ namespace UberSideJobMod
             showUberUI = !showUberUI;
             uiManager.SetUIVisible(showUberUI);
 
-            if (showUberUI)
+            if (showUberUI && !uberJobActive && passengerPool.Count == 0 &&
+                Time.time - lastJobCompletionTime > UberJobCooldown)
             {
-                if (!uberJobActive && currentPassenger == null &&
-                    Time.time - lastPassengerOfferTime > PassengerOfferInterval &&
-                    Time.time - lastJobCompletionTime > UberJobCooldown)
-                {
-                    OfferNewPassenger();
-                    lastPassengerOfferTime = Time.time - PassengerOfferInterval + 15f;
-                }
-            }
-            else if (!uberJobActive && currentPassenger != null)
-            {
-                currentPassenger = null;
+                GenerateNewPassengerForPool();
+                lastPassengerOfferTime = Time.time;
             }
         }
 
-        private void OnAcceptButtonClicked()
+        private void OnAcceptPassenger(UberPassenger passenger)
         {
+            currentPassenger = passenger;
             uberJobActive = true;
-            ShowNotification($"Ride accepted! Drive to pick up {currentPassenger.passengerName}\nat {currentPassenger.pickupAddress.DisplayName}.");
+            string notificationMessage = $"Ride accepted!\n\nDrive to pick up <color=yellow>{currentPassenger.passengerName}</color>, at <b><color=white>{currentPassenger.pickupAddress.DisplayName}</color></b> <color=yellow>({currentPassenger.pickupAddress.neighborhood})</color>";
+            ShowNotification(notificationMessage);
             CityManager.Instance.FindBuildingAndSetGuider(currentPassenger.pickupAddress.gameAddress, true);
             SpawnPickupCircle();
-            lastCollisionTime = 0f;
+            lastCollisionTime = Time.time;
             lastSuddenStopTime = -100f;
             suddenStopCooldown = 0f;
             isCollision = false;
-        }
 
-        private void OnDeclineButtonClicked()
-        {
-            uberJobActive = false;
-            currentPassenger = null;
-            showUberUI = true;
-            lastJobCompletionTime = Time.time - UberJobCooldown + 60f;
-            ShowNotification("Uber ride declined.");
-            uiManager.UpdateUI(driverStats, currentPassenger, isPeakHours, uberJobActive);
+            Queue<UberPassenger> tempQueue = new Queue<UberPassenger>();
+            while (passengerPool.Count > 0)
+            {
+                var queuedPassenger = passengerPool.Dequeue();
+                if (queuedPassenger != passenger)
+                {
+                    tempQueue.Enqueue(queuedPassenger);
+                }
+            }
+            passengerPool = tempQueue;
         }
 
         private void OnCancelButtonClicked()
@@ -749,9 +734,10 @@ namespace UberSideJobMod
             CleanupCircles();
             currentPassenger = null;
             showUberUI = true;
+            uiManager.SetUIVisible(showUberUI);
             ShowNotification("Uber ride canceled by driver.");
             SaveDriverStats();
-            uiManager.UpdateUI(driverStats, currentPassenger, isPeakHours, uberJobActive);
+            uiManager.UpdateUI(driverStats, currentPassenger, passengerPool, isPeakHours, uberJobActive);
             lastPassengerOfferTime = Time.time - PassengerOfferInterval + 15f;
         }
 
@@ -760,46 +746,240 @@ namespace UberSideJobMod
             uiManager?.DestroyUI();
             CleanupCircles();
         }
-
         #endregion
 
         #region Passenger Management
-
-        private void OfferNewPassenger()
+        private void GenerateNewPassengerForPool()
         {
-            if (addresses.Count < 2)
+            if (addresses.Count < 2) return;
+
+            int currentHour = Il2Cpp.TimeHelper.CurrentHour;
+
+            PassengerType passengerType;
+            float rand = UnityEngine.Random.Range(0f, 1f);
+            if (currentHour >= 5 && currentHour < 9)
             {
+                if (rand < 0.5f) passengerType = PassengerType.Business;
+                else if (rand < 0.8f) passengerType = PassengerType.Regular;
+                else if (rand < 0.95f) passengerType = PassengerType.Silent;
+                else passengerType = PassengerType.Tourist;
+            }
+            else if (currentHour >= 9 && currentHour < 17)
+            {
+                if (rand < 0.3f) passengerType = PassengerType.Business;
+                else if (rand < 0.7f) passengerType = PassengerType.Regular;
+                else if (rand < 0.8f) passengerType = PassengerType.Silent;
+                else passengerType = PassengerType.Tourist;
+            }
+            else if (currentHour >= 17 && currentHour < 22)
+            {
+                if (rand < 0.2f) passengerType = PassengerType.Business;
+                else if (rand < 0.55f) passengerType = PassengerType.Regular;
+                else if (rand < 0.65f) passengerType = PassengerType.Silent;
+                else if (rand < 0.8f) passengerType = PassengerType.Tourist;
+                else passengerType = PassengerType.Party;
+            }
+            else
+            {
+                if (rand < 0.05f) passengerType = PassengerType.Business;
+                else if (rand < 0.25f) passengerType = PassengerType.Regular;
+                else if (rand < 0.45f) passengerType = PassengerType.Silent;
+                else if (rand < 0.6f) passengerType = PassengerType.Tourist;
+                else passengerType = PassengerType.Party;
+            }
+
+            List<BusinessTypeName> preferredBusinessTypes = businessTypePool.preferredBusinessTypes[passengerType];
+
+            List<Address> residentialAddresses = addresses.Where(a => a.buildingType.ToLower() == "residential").ToList();
+            if (residentialAddresses.Count == 0)
+            {
+                MelonLogger.Warning("No Residential addresses found. Falling back to all addresses for Residential selection.");
+                residentialAddresses = addresses.ToList();
+            }
+
+            List<Address> preferredBusinessAddresses;
+            if (preferredBusinessTypes.Count > 0 && passengerType != PassengerType.Silent)
+            {
+                if (currentHour >= 22 || currentHour < 6)
+                {
+                    if (passengerType == PassengerType.Party)
+                    {
+                        preferredBusinessAddresses = addresses.Where(a =>
+                            preferredBusinessTypes.Contains(a.businessType)).ToList();
+                    }
+                    else
+                    {
+                        preferredBusinessAddresses = addresses.Where(a =>
+                            (a.businessType == BusinessTypeName.Nightclub ||
+                             a.businessType == BusinessTypeName.Casino ||
+                             a.businessType == BusinessTypeName.Hospital ||
+                             a.businessType == BusinessTypeName.GasStation ||
+                             a.businessType == BusinessTypeName.Supermarket) &&
+                            a.buildingType.ToLower() != "residential").ToList();
+                    }
+                }
+                else
+                {
+                    preferredBusinessAddresses = addresses.Where(a => preferredBusinessTypes.Contains(a.businessType)).ToList();
+                }
+            }
+            else
+            {
+                if (currentHour >= 22 || currentHour < 6)
+                {
+                    preferredBusinessAddresses = addresses.Where(a =>
+                        (a.businessType == BusinessTypeName.Nightclub ||
+                         a.businessType == BusinessTypeName.Casino ||
+                         a.businessType == BusinessTypeName.Hospital ||
+                         a.businessType == BusinessTypeName.GasStation ||
+                         a.businessType == BusinessTypeName.Supermarket) &&
+                        a.buildingType.ToLower() != "residential").ToList();
+                }
+                else
+                {
+                    preferredBusinessAddresses = addresses.Where(a =>
+                        a.businessType != BusinessTypeName.Empty &&
+                        a.buildingType.ToLower() != "residential").ToList();
+                }
+            }
+
+            if (preferredBusinessAddresses.Count == 0)
+            {
+                MelonLogger.Warning($"No addresses match preferred business types for {passengerType} at hour {currentHour}. Falling back.");
+                preferredBusinessAddresses = addresses.Where(a => a.buildingType.ToLower() != "residential").ToList();
+                if (preferredBusinessAddresses.Count == 0)
+                {
+                    MelonLogger.Warning("No non-Residential addresses available. Using all addresses.");
+                    preferredBusinessAddresses = addresses.ToList();
+                }
+            }
+
+            Address pickupAddress;
+            float residentialPickupChance;
+            if (currentHour >= 5 && currentHour < 10)
+                residentialPickupChance = 0.7f;
+            else if (currentHour >= 10 && currentHour < 17)
+                residentialPickupChance = 0.6f;
+            else if (currentHour >= 17 && currentHour < 22)
+                residentialPickupChance = 0.5f;
+            else
+                residentialPickupChance = 0.4f;
+
+            if (passengerType == PassengerType.Party && (currentHour >= 22 || currentHour < 3))
+                residentialPickupChance *= 0.75f;
+
+            bool isResidentialPickup = UnityEngine.Random.Range(0f, 1f) < residentialPickupChance;
+
+            if (isResidentialPickup && residentialAddresses.Count > 0)
+            {
+                pickupAddress = residentialAddresses[UnityEngine.Random.Range(0, residentialAddresses.Count)];
+            }
+            else
+            {
+                pickupAddress = preferredBusinessAddresses[UnityEngine.Random.Range(0, preferredBusinessAddresses.Count)];
+            }
+
+            Address dropoffAddress;
+            float residentialDropoffChance;
+            if (currentHour >= 5 && currentHour < 10)
+                residentialDropoffChance = 0.3f;
+            else if (currentHour >= 10 && currentHour < 17)
+                residentialDropoffChance = 0.4f;
+            else if (currentHour >= 17 && currentHour < 22)
+                residentialDropoffChance = 0.5f;
+            else
+                residentialDropoffChance = 0.6f;
+
+            if (pickupAddress.buildingType.ToLower() == "residential")
+                residentialDropoffChance *= 0.75f;
+
+            bool isResidentialDropoff = UnityEngine.Random.Range(0f, 1f) < residentialDropoffChance;
+
+            List<Address> possibleDropoffAddresses;
+            if (isResidentialDropoff)
+            {
+                possibleDropoffAddresses = residentialAddresses.Where(a => a.gameAddress != pickupAddress.gameAddress).ToList();
+            }
+            else
+            {
+                if ((passengerType == PassengerType.Party || passengerType == PassengerType.Regular) && !isResidentialPickup)
+                {
+                    BusinessTypeName pickupBusinessType = pickupAddress.businessType;
+                    possibleDropoffAddresses = preferredBusinessAddresses
+                        .Where(a => a.gameAddress != pickupAddress.gameAddress && a.businessType != pickupBusinessType)
+                        .ToList();
+                    if (possibleDropoffAddresses.Count == 0)
+                    {
+                        MelonLogger.Warning($"No different business type dropoff addresses for {passengerType} after {pickupBusinessType} pickup.");
+                        possibleDropoffAddresses = preferredBusinessAddresses.Where(a => a.gameAddress != pickupAddress.gameAddress).ToList();
+                    }
+                }
+                else
+                {
+                    possibleDropoffAddresses = preferredBusinessAddresses.Where(a => a.gameAddress != pickupAddress.gameAddress).ToList();
+                }
+            }
+
+            if (possibleDropoffAddresses.Count == 0)
+            {
+                MelonLogger.Warning($"No valid dropoff addresses for {passengerType} after pickup selection. Using fallback.");
+                possibleDropoffAddresses = addresses.Where(a => a.gameAddress != pickupAddress.gameAddress).ToList();
+                if (possibleDropoffAddresses.Count == 0)
+                {
+                    MelonLogger.Error("No valid dropoff addresses available. Aborting passenger generation.");
+                    return;
+                }
+            }
+            dropoffAddress = possibleDropoffAddresses[UnityEngine.Random.Range(0, possibleDropoffAddresses.Count)];
+
+            if (!buildingPositions.ContainsKey(pickupAddress.gameAddress) || !buildingPositions.ContainsKey(dropoffAddress.gameAddress))
+            {
+                MelonLogger.Error("Could not find building positions for pickup or dropoff address");
                 return;
             }
 
-            var pickup = addresses[UnityEngine.Random.Range(0, addresses.Count)];
-            Address dropoff;
-
-            do
-            {
-                dropoff = addresses[UnityEngine.Random.Range(0, addresses.Count)];
-            } while (dropoff.gameAddress == pickup.gameAddress);
-
-            if (!buildingPositions.ContainsKey(pickup.gameAddress) || !buildingPositions.ContainsKey(dropoff.gameAddress))
-            {
-                MelonLogger.Error("Could not find building positions for pickup or dropoff");
-                return;
-            }
-
-            Vector3 pickupPos = buildingPositions[pickup.gameAddress];
-            Vector3 dropoffPos = buildingPositions[dropoff.gameAddress];
+            Vector3 pickupPos = buildingPositions[pickupAddress.gameAddress];
+            Vector3 dropoffPos = buildingPositions[dropoffAddress.gameAddress];
             float distance = Vector3.Distance(pickupPos, dropoffPos);
-            float fareMultiplier = isPeakHours ? PeakMultiplier : 1.0f;
+            float fareMultiplier = 1.0f;
+            if ((currentHour >= 7 && currentHour < 10) || (currentHour >= 16 && currentHour < 19))
+                fareMultiplier = 1.3f;
+            else if (currentHour >= 22 || currentHour < 5)
+                fareMultiplier = 1.25f;
+            if (isPeakHours)
+                fareMultiplier *= PeakMultiplier;
             float fare = CalculateFare(distance) * fareMultiplier;
 
-            PassengerType passengerType = DeterminePassengerType(pickup);
             Gender passengerGender = UnityEngine.Random.Range(0, 2) == 0 ? Gender.Male : Gender.Female;
             string passengerName = GeneratePassengerName(passengerGender);
 
-            currentPassenger = new UberPassenger
+            string pickupLocationName = pickupAddress.buildingType.ToLower() == "residential" ? "Residential" : pickupAddress.businessType.ToString();
+            string dropoffLocationName = dropoffAddress.buildingType.ToLower() == "residential" ? "Residential" : dropoffAddress.businessType.ToString();
+            List<string> conversationLines = new List<string>();
+            if (passengerType == PassengerType.Business)
             {
-                pickupAddress = pickup,
-                dropoffAddress = dropoff,
+                string dynamicKey = (currentHour >= 22 || currentHour < 6) ? "dynamic_night" : "dynamic_day";
+                if (PassengerDialogues.Comments[passengerType].ContainsKey(dynamicKey))
+                {
+                    foreach (var line in PassengerDialogues.Comments[passengerType][dynamicKey][passengerGender])
+                    {
+                        conversationLines.Add(string.Format(line, pickupLocationName, dropoffLocationName));
+                    }
+                }
+            }
+            else if (PassengerDialogues.Comments[passengerType].ContainsKey("dynamic"))
+            {
+                foreach (var line in PassengerDialogues.Comments[passengerType]["dynamic"][passengerGender])
+                {
+                    conversationLines.Add(string.Format(line, pickupLocationName, dropoffLocationName));
+                }
+            }
+            conversationLines.AddRange(PassengerDialogues.Comments[passengerType]["regular"][passengerGender]);
+
+            var newPassenger = new UberPassenger
+            {
+                pickupAddress = pickupAddress,
+                dropoffAddress = dropoffAddress,
                 pickupLocation = pickupPos,
                 dropoffLocation = dropoffPos,
                 fare = fare,
@@ -808,47 +988,14 @@ namespace UberSideJobMod
                 distanceToDestination = distance,
                 passengerType = passengerType,
                 passengerName = passengerName,
-                conversationLines = PassengerDialogues.Comments[passengerType]["regular"]
-                    .SelectMany(kvp => kvp.Value)
-                    .ToArray(),
+                conversationLines = conversationLines.ToArray(),
                 collisionCount = 0,
                 suddenStopCount = 0,
                 totalSpeedingTime = 0f,
                 gender = passengerGender
             };
 
-            string surgeMessage = isPeakHours ? " (Surge Pricing Active!)" : "";
-            string message = $"New Uber Passenger Request!{surgeMessage}\n" +
-                             $"Passenger: {passengerName}\n" +
-                             $"Pickup: {pickup.DisplayName}, {pickup.neighborhood}\n" +
-                             $"Dropoff: {dropoff.DisplayName}, {dropoff.neighborhood}\n" +
-                             $"Estimated Fare: ${fare:F2}";
-            ShowNotification(message);
-            showUberUI = true;
-        }
-
-        private PassengerType DeterminePassengerType(Address pickup)
-        {
-            PassengerType passengerType = (PassengerType)UnityEngine.Random.Range(0, 5);
-
-            if (pickup.businessType == BusinessTypeName.JewelryStore || pickup.businessType == BusinessTypeName.Bank || pickup.businessType == BusinessTypeName.LawFirm)
-            {
-                passengerType = UnityEngine.Random.Range(0, 100) < 50 ? PassengerType.Business : passengerType;
-            }
-            else if (pickup.businessType == BusinessTypeName.Nightclub || pickup.businessType == BusinessTypeName.Casino)
-            {
-                passengerType = UnityEngine.Random.Range(0, 100) < 50 ? PassengerType.Party : passengerType;
-            }
-            else if (pickup.businessType == BusinessTypeName.GiftShop || pickup.businessType == BusinessTypeName.Florist)
-            {
-                passengerType = UnityEngine.Random.Range(0, 100) < 50 ? PassengerType.Tourist : passengerType;
-            }
-            else if (pickup.businessType == BusinessTypeName.Bookstore || pickup.businessType == BusinessTypeName.CoffeeShop)
-            {
-                passengerType = UnityEngine.Random.Range(0, 100) < 50 ? PassengerType.Regular : passengerType;
-            }
-
-            return passengerType;
+            passengerPool.Enqueue(newPassenger);
         }
 
         private string GeneratePassengerName(Gender gender)
@@ -860,6 +1007,41 @@ namespace UberSideJobMod
             return $"{firstName} {lastName}";
         }
 
+        private string GetDisplayLocationName(string buildingType, string businessType)
+        {
+            if (!string.IsNullOrEmpty(buildingType) && buildingType.ToLower() == "residential")
+            {
+                return conversationRandom.Next(0, 2) == 0 ? "Apartment" : "Home";
+            }
+
+            if (!string.IsNullOrEmpty(businessType))
+            {
+                switch (businessType)
+                {
+                    case "WebDevelopmentAgency":
+                        return "Web Development Agency";
+                    case "LawFirm":
+                        return "Law Firm";
+                    case "Nightclub":
+                        return "Night Club";
+                    case "GasStation":
+                        return "Gas Station";
+                    default:
+                        string result = "";
+                        for (int i = 0; i < businessType.Length; i++)
+                        {
+                            if (i > 0 && char.IsUpper(businessType[i]))
+                            {
+                                result += " ";
+                            }
+                            result += businessType[i];
+                        }
+                        return result;
+                }
+            }
+
+            return "Unknown Location";
+        }
         private void ShowPassengerConversation()
         {
             if (currentPassenger == null || !currentPassenger.isPickedUp)
@@ -867,17 +1049,22 @@ namespace UberSideJobMod
                 return;
             }
 
-            // Skip conversation for Silent passengers most of the time, unless there's a recent sudden stop
+            if (conversationCount == 0)
+            {
+                hasShownVehicleComment = false;
+                hasQueuedSpecialTouristComment = false;
+            }
+
             if (currentPassenger.passengerType == PassengerType.Silent &&
-                UnityEngine.Random.Range(0, 100) < 90 &&
+                conversationRandom.Next(0, 100) < 90 &&
                 Time.time - lastSuddenStopTime >= 10f)
             {
                 return;
             }
 
             string commentType;
+            bool isDynamicLine = false;
 
-            // First conversation or no regular conversation yet defaults to regular
             if (conversationCount == 0 || !hadRegularConversation)
             {
                 commentType = "regular";
@@ -885,7 +1072,6 @@ namespace UberSideJobMod
             }
             else
             {
-                // Determine comment type based on driving state, leveraging metrics updated in EfficientUberJobRoutine
                 if (isCollision && currentPassenger.collisionCount > 0 && Time.time - lastCollisionTime < 10f && Time.time >= currentPassenger.pickupTime)
                 {
                     commentType = "collision";
@@ -901,12 +1087,12 @@ namespace UberSideJobMod
                 else if (smoothDrivingTime > 60f)
                 {
                     commentType = "smooth";
-                    smoothDrivingTime = 0f; // Reset to allow future smooth comments
+                    smoothDrivingTime = 0f;
                 }
                 else if (currentSpeed < 5f && Time.time - lastSuddenStopTime > 10f)
                 {
                     var brakes = GetPlayerVehicle()?.gameObject?.GetComponent<Il2CppNWH.VehiclePhysics2.Brakes>();
-                    if (brakes != null && brakes._isBraking && autoParkSupported && UnityEngine.Random.Range(0, 100) < 30)
+                    if (brakes != null && brakes._isBraking && autoParkSupported && conversationRandom.Next(0, 100) < 30)
                     {
                         commentType = "parking";
                     }
@@ -929,12 +1115,12 @@ namespace UberSideJobMod
             string greeting = GetPassengerGreeting(commentType);
             bool canFlirt = ShouldUseFlirtyDialogue();
 
-            if (commentType == "regular" && canFlirt && UnityEngine.Random.Range(0, 100) < 15)
+            if (commentType == "regular" && canFlirt && conversationRandom.Next(0, 100) < 15)
             {
                 commentType = "flirty";
             }
 
-            if (commentType == "regular" && UnityEngine.Random.Range(0, 100) < 25)
+            if (commentType == "regular" && !hasShownVehicleComment && conversationRandom.Next(0, 100) < 25)
             {
                 ShowVehicleComment(greeting, vehicleName, isHighEndVehicle, effectiveEnginePower);
                 return;
@@ -947,84 +1133,325 @@ namespace UberSideJobMod
             }
 
             commentType = AdjustCommentType(commentType);
-            var comments = PassengerDialogues.Comments[currentPassenger.passengerType][commentType][playerGender];
-            string conversation = comments[UnityEngine.Random.Range(0, comments.Count)];
 
-            if (commentType == "regular" && (currentPassenger.passengerType == PassengerType.Business || currentPassenger.passengerType == PassengerType.Regular))
+            string conversation;
+            string pickupDisplayName = GetDisplayLocationName(
+                currentPassenger.pickupAddress.buildingType,
+                currentPassenger.pickupAddress.businessType.ToString());
+            string dropoffDisplayName = GetDisplayLocationName(
+                currentPassenger.dropoffAddress.buildingType,
+                currentPassenger.dropoffAddress.businessType.ToString());
+
+            string pickupLocationType = currentPassenger.pickupAddress.buildingType.ToLower() == "residential"
+                ? "Residential"
+                : currentPassenger.pickupAddress.businessType.ToString();
+            string dropoffLocationType = currentPassenger.dropoffAddress.buildingType.ToLower() == "residential"
+                ? "Residential"
+                : currentPassenger.dropoffAddress.businessType.ToString();
+
+            bool isSameResidential = pickupLocationType == "Residential" && dropoffLocationType == "Residential";
+            bool isSameBusinessType = !isSameResidential && pickupLocationType == dropoffLocationType;
+
+            if (commentType.StartsWith("dynamic") || commentType == "regular")
             {
-                conversation = $"{greeting}{conversation}";
+                if (isSameResidential && commentType.StartsWith("dynamic"))
+                {
+                    commentType = "regular";
+                }
+
+                if (commentType == "regular")
+                {
+                    bool canUseDynamic = !isSameResidential && !(isSameBusinessType && currentPassenger.passengerType == PassengerType.Regular);
+                    if (conversationRandom.Next(0, 100) < 50 && currentPassenger.conversationLines.Length > 0 && canUseDynamic)
+                    {
+                        string dynamicCommentType = "dynamic";
+                        if (currentPassenger.passengerType == PassengerType.Business)
+                        {
+                            int currentHour = Il2Cpp.TimeHelper.CurrentHour;
+                            if (currentHour >= 22 || currentHour < 6)
+                            {
+                                dynamicCommentType = "dynamic_night";
+                            }
+                            else
+                            {
+                                dynamicCommentType = isSameBusinessType ? "dynamic_day_same_type" : "dynamic_day";
+                            }
+                        }
+                        else if (isSameBusinessType && currentPassenger.passengerType == PassengerType.Party)
+                        {
+                            dynamicCommentType = "dynamic_same_type";
+                        }
+
+                        var dynamicLines = currentPassenger.conversationLines
+                            .Where(line => line.Contains(pickupLocationType) || line.Contains(dropoffLocationType))
+                            .ToList();
+
+                        if (dynamicLines.Count > 0)
+                        {
+                            string key = $"dynamic_{currentPassenger.passengerType}_{playerGender}";
+                            conversation = dynamicLines[ConversationTracker.GetRandomLineIndex(dynamicLines, key)];
+                            isDynamicLine = true;
+
+                            conversation = conversation
+                                .Replace("{0}", pickupDisplayName)
+                                .Replace("{1}", dropoffDisplayName)
+                                .Replace("Residential", pickupDisplayName)
+                                .Replace(pickupLocationType, pickupDisplayName)
+                                .Replace(dropoffLocationType, dropoffDisplayName);
+                        }
+                        else
+                        {
+                            if (currentPassenger.passengerType == PassengerType.Tourist && !currentPassenger.hadSpecialConversation && !hasQueuedSpecialTouristComment && conversationCount < 2)
+                            {
+                                MelonCoroutines.Start(ShowSpecialTouristConversation());
+                                hasQueuedSpecialTouristComment = true;
+                                return;
+                            }
+                            conversation = PassengerDialogues.GetRandomComment(currentPassenger.passengerType, commentType, playerGender);
+                        }
+                    }
+                    else
+                    {
+                        if (currentPassenger.passengerType == PassengerType.Tourist && !currentPassenger.hadSpecialConversation && !hasQueuedSpecialTouristComment && conversationCount < 2)
+                        {
+                            MelonCoroutines.Start(ShowSpecialTouristConversation());
+                            hasQueuedSpecialTouristComment = true;
+                            return;
+                        }
+                        conversation = PassengerDialogues.GetRandomComment(currentPassenger.passengerType, commentType, playerGender);
+                    }
+                }
+                else
+                {
+                    if (currentPassenger.passengerType == PassengerType.Business)
+                    {
+                        int currentHour = Il2Cpp.TimeHelper.CurrentHour;
+                        if (currentHour >= 22 || currentHour < 6)
+                        {
+                            commentType = "dynamic_night";
+                        }
+                        else
+                        {
+                            commentType = isSameBusinessType ? "dynamic_day_same_type" : "dynamic_day";
+                        }
+                    }
+                    else if (currentPassenger.passengerType == PassengerType.Party && isSameBusinessType)
+                    {
+                        commentType = "dynamic_same_type";
+                    }
+
+                    conversation = PassengerDialogues.GetRandomComment(currentPassenger.passengerType, commentType, playerGender);
+                    if (!string.IsNullOrEmpty(conversation))
+                    {
+                        conversation = conversation
+                            .Replace("{0}", pickupDisplayName)
+                            .Replace("{1}", dropoffDisplayName)
+                            .Replace("Residential", pickupDisplayName)
+                            .Replace(pickupLocationType, pickupDisplayName)
+                            .Replace(dropoffLocationType, dropoffDisplayName);
+                        isDynamicLine = true;
+                    }
+                }
+            }
+            else
+            {
+                conversation = PassengerDialogues.GetRandomComment(currentPassenger.passengerType, commentType, playerGender);
+            }
+
+            if (string.IsNullOrEmpty(conversation))
+            {
+                return;
+            }
+
+            if (commentType == "speeding" || commentType == "sudden_stop" || commentType == "collision")
+            {
+                currentPassenger.negativeInteractions += (int)1f;
+            }
+            else if (commentType == "smooth")
+            {
+                currentPassenger.positiveInteractions += (int)1f;
+            }
+
+            if (!isDynamicLine)
+            {
+                conversation = greeting + conversation;
             }
 
             ShowNotification($"{currentPassenger.passengerName}: \"{conversation}\"", NotificationType.Info, 15f);
             conversationShown = true;
             conversationCount++;
 
-            UpdatePassengerInteractions(commentType);
-
-            if (currentPassenger.passengerType == PassengerType.Tourist &&
-                commentType == "regular" &&
-                conversationCount >= 2 &&
-                !currentPassenger.hadSpecialConversation &&
-                UnityEngine.Random.Range(0, 100) < 40)
-            {
-                MelonCoroutines.Start(ShowSpecialTouristConversation());
-            }
-
             MelonCoroutines.Start(ResetConversationFlag());
         }
 
         private string GetPassengerGreeting(string commentType)
         {
-            if (commentType != "regular" || (currentPassenger.passengerType != PassengerType.Business && currentPassenger.passengerType != PassengerType.Regular))
+            List<string> greetings;
+            if (commentType == "flirty")
             {
-                return "";
+                greetings = playerGender == Gender.Male
+                    ? new List<string> { "Hey there, ", "Well, hi, ", "Oh, " }
+                    : new List<string> { "Hi, sweetie, ", "Hey, love, ", "Oh, dear, " };
+            }
+            else if (commentType == "speeding" || commentType == "sudden_stop" || commentType == "collision")
+            {
+                greetings = new List<string> { "Whoa, ", "Hey, ", "Oh no, " };
+            }
+            else
+            {
+                greetings = new List<string> { "Hey, ", "Hi, ", "So, " };
             }
 
-            return currentPassenger.gender == Gender.Male ? "" : "";
+            string key = $"greeting_{commentType}_{playerGender}";
+            return greetings[ConversationTracker.GetRandomLineIndex(greetings, key)];
         }
 
         private bool ShouldUseFlirtyDialogue()
         {
-            bool isOppositeGender = playerGender != currentPassenger.gender;
-            return (currentPassenger.passengerType == PassengerType.Party) ||
-                   (isOppositeGender && currentPassenger.passengerType != PassengerType.Silent);
+            return currentPassenger.passengerType != PassengerType.Silent &&
+                   currentPassenger.positiveInteractions > currentPassenger.negativeInteractions &&
+                   conversationCount > 0;
         }
 
         private void ShowVehicleComment(string greeting, string vehicleName, bool isHighEndVehicle, float effectiveEnginePower)
         {
-            string vehicleComment = isHighEndVehicle && !string.IsNullOrEmpty(vehicleName) ?
-                currentPassenger.passengerType switch
+            string vehicleComment;
+
+            if (isHighEndVehicle && !string.IsNullOrEmpty(vehicleName))
+            {
+                Dictionary<PassengerType, List<string>> highEndCommentsMale = new Dictionary<PassengerType, List<string>>
                 {
-                    PassengerType.Business => playerGender == Gender.Male ?
-                        $"{greeting}This {vehicleName} is perfect for my meetings, man!" :
-                        $"{greeting}This {vehicleName} is ideal for work, dear!",
-                    PassengerType.Tourist => playerGender == Gender.Male ?
-                        $"Wow, a {vehicleName}? This ride’s a trip highlight, dude!" :
-                        $"A {vehicleName}? Loving this ride, hon!",
-                    PassengerType.Party => playerGender == Gender.Male ?
-                        $"Yo, a {vehicleName}? This car’s fire, bro!" :
-                        $"Hey, a {vehicleName}? Total vibes, love!",
-                    PassengerType.Silent => $"*nods approvingly at the {vehicleName}*",
-                    _ => playerGender == Gender.Male ?
-                        $"{greeting}Nice {vehicleName}, feels special, man!" :
-                        $"{greeting}Great {vehicleName}, love the vibe, dear!"
-                } :
-                currentVehicleCategory switch
-                {
-                    VehicleCategory.Luxury => currentPassenger.passengerType == PassengerType.Business ?
-                        playerGender == Gender.Male ? $"{greeting}This car’s upscale, bro!" :
-                        $"{greeting}So luxurious, hon!" : "Pure luxury ride!",
-                    VehicleCategory.Economy => currentPassenger.passengerType == PassengerType.Tourist ?
-                        effectiveEnginePower < 40f ? "Vibe’s cool but it’s slow!" :
-                        "This car’s got charm!" :
-                        effectiveEnginePower < 40f ? $"{greeting}We’re crawling, man!" :
-                        $"{greeting}Hope it holds up, dear!",
-                    VehicleCategory.Performance => currentPassenger.passengerType == PassengerType.Party ?
-                        effectiveEnginePower > 80f ? "This car’s a beast, awesome!" :
-                        "Cool ride, crank it up!" : "Feels fast just sitting here!",
-                    _ => autoParkSupported ? $"{greeting}Solid car, neat tech!" :
-                        $"{greeting}Good car, gets it done."
+                    { PassengerType.Business, new List<string>
+                        {
+                            "{0}This {1} is perfect for my meetings!",
+                            "{0}This {1} suits my style, bro!",
+                            "{0}Love the class of this {1}, man!"
+                        }
+                    },
+                    { PassengerType.Tourist, new List<string>
+                        {
+                            "Wow, {1}? This ride’s a trip highlight dude!",
+                            "This {1} is awesome, pal!",
+                            "{1}? Making memories in this, bro!"
+                        }
+                    },
+                    { PassengerType.Party, new List<string>
+                        {
+                            "Yo, {1}? This car’s fire, bro!",
+                            "This {1} is lit, dude!",
+                            "Party vibes with this {1}, man!"
+                        }
+                    },
+                    { PassengerType.Silent, new List<string>
+                        {
+                            "*nods approvingly at the {1}*",
+                            "*glances at the {1} with a slight smile*",
+                            "*quietly appreciates the {1}*"
+                        }
+                    },
+                    { PassengerType.Regular, new List<string>
+                        {
+                            "{0}Nice {1}, I feel special!",
+                            "{0}This {1} is awesome, man!",
+                            "{0}Great pick with this {1}, bro!"
+                        }
+                    }
                 };
+
+                Dictionary<PassengerType, List<string>> highEndCommentsFemale = new Dictionary<PassengerType, List<string>>
+                {
+                    { PassengerType.Business, new List<string>
+                        {
+                            "{0}This {1} is ideal for work, dear!",
+                            "{0}This {1} has such elegance, hon!",
+                            "{0}Perfect {1} for my schedule, love!"
+                        }
+                    },
+                    { PassengerType.Tourist, new List<string>
+                        {
+                            "{1}? Loving this ride, hon!",
+                            "This {1} is so fun, dear!",
+                            "Wow, {1}? Best part of my trip, amiga!"
+                        }
+                    },
+                    { PassengerType.Party, new List<string>
+                        {
+                            "Hey, {1}? Total vibes, love it!",
+                            "This {1} is giving party energy, babe!",
+                            "{1}? Obsessed with this ride, hon!"
+                        }
+                    },
+                    { PassengerType.Silent, new List<string>
+                        {
+                            "*nods approvingly at the {1}*",
+                            "*glances at the {1} with a slight smile*",
+                            "*quietly appreciates the {1}*"
+                        }
+                    },
+                    { PassengerType.Regular, new List<string>
+                        {
+                            "{0}Great {1}, love the vibe!",
+                            "{0}This {1} feels so nice, dear!",
+                            "{0}Amazing {1}, I’m impressed, hon!"
+                        }
+                    }
+                };
+
+                var commentList = playerGender == Gender.Male ? highEndCommentsMale[currentPassenger.passengerType] : highEndCommentsFemale[currentPassenger.passengerType];
+                string key = $"vehicle_highend_{currentPassenger.passengerType}_{playerGender}";
+                vehicleComment = commentList[ConversationTracker.GetRandomLineIndex(commentList, key)];
+                vehicleComment = string.Format(vehicleComment, greeting, vehicleName);
+            }
+            else
+            {
+                if (currentVehicleCategory == VehicleCategory.Luxury)
+                {
+                    List<string> luxuryComments = currentPassenger.passengerType == PassengerType.Business
+                        ? (playerGender == Gender.Male
+                            ? new List<string> { "{0}This car’s upscale bro!", "{0}Feeling fancy in this, man!", "{0}Luxury suits me, pal!" }
+                            : new List<string> { "{0}So luxurious, hon!", "{0}This car’s pure elegance, dear!", "{0}Love the luxury feel, love!" })
+                        : new List<string> { "Pure luxury ride!", "This car’s so plush!", "Feels like a dream ride!" };
+
+                    string key = $"vehicle_luxury_{currentPassenger.passengerType}_{playerGender}";
+                    vehicleComment = luxuryComments[ConversationTracker.GetRandomLineIndex(luxuryComments, key)];
+                    vehicleComment = string.Format(vehicleComment, greeting);
+                }
+                else if (currentVehicleCategory == VehicleCategory.Economy)
+                {
+                    List<string> economyComments = currentPassenger.passengerType == PassengerType.Tourist
+                        ? (effectiveEnginePower < 40f
+                            ? new List<string> { "Vibe’s cool but it’s slow!", "This car’s a bit sluggish, huh?", "Charming, but needs more power!" }
+                            : new List<string> { "This car’s got charm!", "Love the quirky feel of this ride!", "This car’s got character!" })
+                        : (effectiveEnginePower < 40f
+                            ? new List<string> { "{0}We’re crawling!", "{0}This car’s too slow, ugh!", "{0}Feels like we’re barely moving!" }
+                            : new List<string> { "{0}Hope it holds up dear!", "{0}This car’s doing its best, I guess!", "{0}Let’s see if this ride makes it!" });
+
+                    string key = $"vehicle_economy_{currentPassenger.passengerType}_{effectiveEnginePower < 40f}_{playerGender}";
+                    vehicleComment = economyComments[ConversationTracker.GetRandomLineIndex(economyComments, key)];
+                    vehicleComment = string.Format(vehicleComment, greeting);
+                }
+                else if (currentVehicleCategory == VehicleCategory.Performance)
+                {
+                    List<string> performanceComments = currentPassenger.passengerType == PassengerType.Party
+                        ? (effectiveEnginePower > 80f
+                            ? new List<string> { "This car’s a beast, awesome!", "Feel the power in this ride, wow!", "This car’s insane, love it!" }
+                            : new List<string> { "Cool ride, crank it up!", "This car’s got potential, let’s roll!", "Nice speed in this one, go faster!" })
+                        : new List<string> { "Feels fast just sitting here!", "This car’s got some kick to it!", "Speedy vibe in this ride!" };
+
+                    string key = $"vehicle_performance_{currentPassenger.passengerType}_{effectiveEnginePower > 80f}";
+                    vehicleComment = performanceComments[ConversationTracker.GetRandomLineIndex(performanceComments, key)];
+                }
+                else
+                {
+                    List<string> defaultComments = autoParkSupported
+                        ? new List<string> { "{0}Solid car, neat tech!", "{0}Love the tech in this ride!", "{0}This car’s got cool features!" }
+                        : new List<string> { "{0}Good car, gets it done.", "{0}Reliable ride, nice!", "{0}This car’s solid enough!" };
+
+                    string key = $"vehicle_default_{autoParkSupported}_{playerGender}";
+                    vehicleComment = defaultComments[ConversationTracker.GetRandomLineIndex(defaultComments, key)];
+                    vehicleComment = string.Format(vehicleComment, greeting);
+                }
+            }
 
             ShowNotification($"{currentPassenger.passengerName}: \"{vehicleComment}\"", NotificationType.Info, 15f);
             conversationShown = true;
@@ -1039,82 +1466,51 @@ namespace UberSideJobMod
                 currentPassenger.negativeInteractions += (int)0.5f;
             }
 
+            hasShownVehicleComment = true;
             MelonCoroutines.Start(ResetConversationFlag());
         }
-
         private void ShowParkingComment(string greeting, string vehicleName, bool isHighEndVehicle)
         {
-            string parkingComment = isHighEndVehicle && !string.IsNullOrEmpty(vehicleName) ?
-                currentPassenger.passengerType switch
-                {
-                    PassengerType.Business => playerGender == Gender.Male ?
-                        $"{greeting}Auto-parking in a {vehicleName}? Efficient, man!" :
-                        $"{greeting}That {vehicleName} parks itself? Nice, dear!",
-                    PassengerType.Tourist => playerGender == Gender.Male ?
-                        $"A {vehicleName} that parks? Sweet, dude!" :
-                        $"Self-parking {vehicleName}? Cool, hon!",
-                    PassengerType.Party => playerGender == Gender.Male ?
-                        $"Smooth parking in a {vehicleName}, bro!" :
-                        $"Nice park with that {vehicleName}, love!",
-                    PassengerType.Silent => $"*small nod at the {vehicleName}’s tech*",
-                    _ => playerGender == Gender.Male ?
-                        $"{greeting}Great parking with this {vehicleName}, man!" :
-                        $"{greeting}Smooth parking, dear!"
-                } :
-                currentPassenger.passengerType switch
-                {
-                    PassengerType.Business => playerGender == Gender.Male ?
-                        $"{greeting}Efficient auto-parking, bro!" :
-                        $"{greeting}Love that parking tech, hon!",
-                    PassengerType.Tourist => "The car parks itself? Amazing!",
-                    PassengerType.Party => playerGender == Gender.Male ?
-                        "Smooth parking, didn’t jolt us, man!" :
-                        "Sweet parking, kept our vibe, love!",
-                    PassengerType.Silent => "*small nod at the tech*",
-                    _ => playerGender == Gender.Male ?
-                        $"{greeting}Great parking, man!" :
-                        $"{greeting}Nice parking, dear!"
-                };
+            List<string> parkingComments = new List<string>
+            {
+                "{0}Nice parking assist!",
+                "{0}That auto-park is slick!",
+                "{0}Love the parking tech!"
+            };
 
-            ShowNotification($"{currentPassenger.passengerName}: \"{parkingComment}\"", NotificationType.Info, 15f);
+            string key = $"parking_{playerGender}";
+            string comment = parkingComments[ConversationTracker.GetRandomLineIndex(parkingComments, key)];
+            comment = string.Format(comment, greeting);
+
+            ShowNotification($"{currentPassenger.passengerName}: \"{comment}\"", NotificationType.Info, 15f);
             conversationShown = true;
             conversationCount++;
             currentPassenger.positiveInteractions += (int)1f;
+
             MelonCoroutines.Start(ResetConversationFlag());
         }
 
         private string AdjustCommentType(string commentType)
         {
-            int randomChance = UnityEngine.Random.Range(0, 100);
-
-            if (commentType == "sudden_stop" && randomChance >= 90)
+            if (commentType == "regular" && currentPassenger.passengerType == PassengerType.Party && conversationCount > 1)
             {
-                return "regular";
-            }
+                string pickupLocationType = currentPassenger.pickupAddress.buildingType.ToLower() == "residential"
+                    ? "Residential"
+                    : currentPassenger.pickupAddress.businessType.ToString();
+                string dropoffLocationType = currentPassenger.dropoffAddress.buildingType.ToLower() == "residential"
+                    ? "Residential"
+                    : currentPassenger.dropoffAddress.businessType.ToString();
 
-            if (commentType == "speeding" && randomChance >= 70)
-            {
-                return "regular";
+                if (pickupLocationType == "Nightclub" && dropoffLocationType == "Nightclub")
+                {
+                    return "dynamic_same_type";
+                }
+                else if (pickupLocationType == dropoffLocationType)
+                {
+                    return "dynamic_day_same_type";
+                }
             }
-
-            if (commentType == "smooth" && randomChance >= 40)
-            {
-                return "regular";
-            }
-
             return commentType;
-        }
-
-        private void UpdatePassengerInteractions(string commentType)
-        {
-            if (commentType == "smooth" || (commentType == "regular" && UnityEngine.Random.Range(0, 100) < 70))
-            {
-                currentPassenger.positiveInteractions++;
-            }
-            else if (commentType == "sudden_stop" || commentType == "speeding" || commentType == "collision")
-            {
-                currentPassenger.negativeInteractions++;
-            }
         }
 
         private void ShowCollisionReaction()
@@ -1159,29 +1555,13 @@ namespace UberSideJobMod
             MelonCoroutines.Start(ResetConversationFlag());
         }
 
-        private void CheckDestinationReached(VehicleController playerVehicle)
+        private void HandlePickup(VehicleController playerVehicle, Il2CppNWH.VehiclePhysics2.Damage.DamageHandler damageHandler)
         {
-            if (playerVehicle == null || currentPassenger == null)
-            {
-                return;
-            }
-
-            if (!currentPassenger.isPickedUp)
-            {
-                HandlePickup(playerVehicle);
-            }
-            else
-            {
-                HandleDropoff(playerVehicle);
-            }
-        }
-
-        private void HandlePickup(VehicleController playerVehicle)
-        {
+            if (playerVehicle == null) return;
             float distanceToPickup = Vector3.Distance(playerVehicle.transform.position, currentPassenger.pickupLocation);
             bool isAtPickupAddress = IsPlayerAtAddress(currentPassenger.pickupAddress.gameAddress);
 
-            if (isAtPickupAddress || distanceToPickup < CheckDistance)
+            if ((isAtPickupAddress || distanceToPickup < CheckDistance) && playerVehicle.CurrentSpeed < 5f)
             {
                 timeAtPickupAddress += Time.deltaTime;
                 timeSinceLastOutsideZone = 0f;
@@ -1195,6 +1575,13 @@ namespace UberSideJobMod
                     currentPassenger.totalSpeedingTime = 0f;
                     lastCollisionTime = Time.time;
                     lastSuddenStopTime = -100f;
+
+                    if (damageHandler != null)
+                    {
+                        float originalTime = damageHandler.lastCollisionTime;
+                        damageHandler.lastCollisionTime = 0f;
+                    }
+
                     ShowNotification("Passenger picked up! Drive to the destination.");
 
                     if (pickupCircle != null)
@@ -1217,12 +1604,15 @@ namespace UberSideJobMod
                 }
             }
         }
+
         private void HandleDropoff(VehicleController playerVehicle)
         {
+            if (playerVehicle == null) return;
+
             float distanceToDropoff = Vector3.Distance(playerVehicle.transform.position, currentPassenger.dropoffLocation);
             bool isAtDropoffAddress = IsPlayerAtAddress(currentPassenger.dropoffAddress.gameAddress);
 
-            if (isAtDropoffAddress || distanceToDropoff < CheckDistance)
+            if ((isAtDropoffAddress || distanceToDropoff < CheckDistance) && playerVehicle.CurrentSpeed < 5f)
             {
                 timeAtPickupAddress += Time.deltaTime;
                 timeSinceLastOutsideZone = 0f;
@@ -1257,9 +1647,14 @@ namespace UberSideJobMod
                 AddMoneyToPlayer(tipAmount);
             }
 
-            string completionMessage = $"Uber job completed! You earned ${currentPassenger.fare:F2} fare" +
-                                      (receivedTip ? $"+ ${tipAmount:F2} tip!" : "") +
-                                      $"\n{currentPassenger.passengerName} has arrived at {currentPassenger.dropoffAddress.DisplayName}.";
+            string completionMessage =
+            $"Uber job completed!\n\n" +
+            $"You earned <color=yellow>${currentPassenger.fare:F2}</color> fare" +
+            (receivedTip ? $" + <color=yellow>${tipAmount:F2}</color> tip!" : "") + "\n" +
+            $"<color=yellow>{currentPassenger.passengerName}</color> has arrived at " +
+            $"<color=white>{currentPassenger.dropoffAddress.DisplayName}</color> " +
+            $"<color=yellow>({currentPassenger.dropoffAddress.neighborhood})</color>.";
+
             ShowNotification(completionMessage);
 
             hadRegularConversation = false;
@@ -1272,8 +1667,21 @@ namespace UberSideJobMod
             uberJobActive = false;
             lastJobCompletionTime = Time.time;
 
+            isCollision = false;
+            lastCollisionTime = 0f;
+            lastSuddenStopTime = -100f;
+            suddenStopCooldown = 0f;
+            isSpeeding = false;
+
             MelonCoroutines.Start(RequestRatingAfterDelay(3f, completedPassenger));
             showUberUI = true;
+            uiManager.SetUIVisible(showUberUI);
+
+            if (!uiManager.EnsureContentPanelActive())
+            {
+                MelonLogger.Error("Failed to ensure UberContentPanel is active after CompleteUberJob!");
+            }
+
             SaveDriverStats();
 
             isCompletingJob = false;
@@ -1551,11 +1959,9 @@ namespace UberSideJobMod
                 SaveDriverStats();
             }
         }
-
         #endregion
 
         #region Utility Methods
-
         private Vector3? GetPositionForAddress(Il2Cpp.Address address)
         {
             if (CityManager.Instance.CityBuildingControllersDictionary.TryGetValue(address, out CityBuildingController buildingController) && buildingController != null)
@@ -1771,24 +2177,22 @@ namespace UberSideJobMod
             {
                 if (notificationUI == null || currentPassenger == null)
                 {
-                    MelonLogger.Error("Cannot show driving notification: notificationUI or currentPassenger is null");
                     return;
                 }
 
-                if (!notificationMessages.ContainsKey(currentPassenger.passengerType) ||
-                    !notificationMessages[currentPassenger.passengerType].ContainsKey(eventType))
+                if (drivingDialogues == null)
                 {
-                    MelonLogger.Error($"No notification messages found for passengerType {currentPassenger.passengerType} and eventType {eventType}");
                     return;
                 }
 
-                var messages = notificationMessages[currentPassenger.passengerType][eventType];
-                string message = messages[UnityEngine.Random.Range(0, messages.Count)].Replace("{playerName}", playerName);
+                var messages = drivingDialogues.NotificationMessages[currentPassenger.passengerType][eventType];
+                string message = messages[UnityEngine.Random.Range(0, messages.Count)];
+                string firstName = playerName.Split(' ')[0];
+                message = message.Replace("{playerName}", firstName);
                 notificationUI.ShowNotification(message, notificationType, displayTime);
             }
             catch (Exception ex)
             {
-                MelonLogger.Error($"Failed to show driving notification: {ex.Message}");
             }
         }
 
@@ -1860,34 +2264,29 @@ namespace UberSideJobMod
 
         private bool IsPlayerAtAddress(Il2Cpp.Address targetAddress)
         {
-            if (lastClosestBuildingAddress != null && lastClosestBuildingAddress.Equals(targetAddress))
-            {
-                return true;
-            }
-
-            VehicleController playerVehicle = GetPlayerVehicle();
-
-            if (playerVehicle != null && buildingPositions.ContainsKey(targetAddress))
-            {
-                float distanceToAddress = Vector3.Distance(playerVehicle.transform.position, buildingPositions[targetAddress]);
-
-                if (distanceToAddress < CheckDistance)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return lastClosestBuildingAddress != null && lastClosestBuildingAddress.Equals(targetAddress);
         }
 
         private void UpdateNeighborhood()
         {
-            if (playerHUD != null && playerHUD._lastClosestBuilding != null)
+            if (playerHUD == null)
+            {
+                currentNeighborhood = "Unknown";
+                return;
+            }
+
+            if (playerHUD._lastClosestBuilding == null || playerHUD._lastClosestBuilding.Equals(null))
+            {
+                currentNeighborhood = "Unknown";
+                return;
+            }
+
+            try
             {
                 lastClosestBuildingAddress = playerHUD._lastClosestBuilding.Address;
                 currentNeighborhood = playerHUD._lastClosestBuilding.Neighbourhood.ToString();
             }
-            else
+            catch (Exception ex)
             {
                 currentNeighborhood = "Unknown";
             }
@@ -1895,7 +2294,7 @@ namespace UberSideJobMod
 
         private void UpdateDrivingState(VehicleController playerVehicle)
         {
-            if (playerVehicle == null)
+            if (playerVehicle == null || isCompletingJob)
             {
                 ResetVehicleState();
                 return;
@@ -1974,11 +2373,11 @@ namespace UberSideJobMod
             float adjustedAccelerationThreshold = AccelerationThreshold * (effectiveEnginePower < 40f ? 1.2f : effectiveEnginePower > 80f ? 0.8f : 1f);
             dynamicSpeedLimit = CalculateDynamicSpeedLimit(maxVehicleSpeed, currentVehicleCategory);
 
-            float adjustedSpeedingTolerance = isCheapCar ? 15f : currentVehicleCategory == VehicleCategory.Performance ? 8f : speedingTolerance;
+            float adjustedSpeedingTolerance = isCheapCar ? 20f : currentVehicleCategory == VehicleCategory.Performance ? 15f : 10f;
 
             if (lastVehicleTypeName != null && lastVehicleTypeName.Contains("Honza Mimic"))
             {
-                adjustedSpeedingTolerance = 20f;
+                adjustedSpeedingTolerance = 25f;
             }
 
             if (speedLimiter != null)
@@ -2000,41 +2399,68 @@ namespace UberSideJobMod
 
         private void HandleCollisions(VehicleController playerVehicle, Il2CppNWH.VehiclePhysics2.Damage.DamageHandler damageHandler, float currentTime)
         {
-            if (damageHandler != null)
+            if (damageHandler != null && playerVehicle != null)
             {
                 float vehicleLastCollisionTime = damageHandler.lastCollisionTime;
 
-                if (vehicleLastCollisionTime > lastCollisionTime &&
-                    currentPassenger != null)
+                bool isDuringPickup = currentPassenger != null && !currentPassenger.isPickedUp && timeAtPickupAddress > 0f;
+
+                if (isDuringPickup)
                 {
-                    if (!currentPassenger.isPickedUp)
+                    return;
+                }
+
+                if (currentPassenger != null && vehicleLastCollisionTime < currentPassenger.pickupTime)
+                {
+                    return;
+                }
+
+                if (sessionStartTime == 0f && currentPassenger != null)
+                {
+                    sessionStartTime = currentPassenger.pickupTime;
+                }
+
+                if (sessionStartTime > 0f && vehicleLastCollisionTime < sessionStartTime)
+                {
+                    return;
+                }
+
+                if (vehicleLastCollisionTime > lastCollisionDebounceTime + 1.5f)
+                {
+                    if (currentPassenger != null &&
+                        currentPassenger.isPickedUp &&
+                        vehicleLastCollisionTime > currentPassenger.pickupTime)
                     {
-                        return;
-                    }
+                        if (currentSpeed < 2f)
+                        {
+                            return;
+                        }
 
-                    // Only count collisions after pickup
-                    if (currentSpeed < 2f)
-                    {
-                        return;
-                    }
+                        bool isNearPickupOrDropoff = IsNearPickupOrDropoff(playerVehicle);
+                        if (isNearPickupOrDropoff)
+                        {
+                            return;
+                        }
 
-                    lastCollisionTime = vehicleLastCollisionTime;
-                    isCollision = true;
-                    currentPassenger.collisionCount++;
-                    smoothDrivingTime = Mathf.Max(0, smoothDrivingTime - 60f);
+                        lastCollisionTime = vehicleLastCollisionTime;
+                        lastCollisionDebounceTime = vehicleLastCollisionTime;
+                        isCollision = true;
+                        currentPassenger.collisionCount++;
 
-                    float collisionPenalty = currentVehicleCategory == VehicleCategory.Luxury ? 1.5f :
-                                            currentVehicleCategory == VehicleCategory.Performance ? 2f : 1f;
-                    if (currentSpeed < 10f)
-                    {
-                        collisionPenalty *= 0.5f;
-                    }
+                        smoothDrivingTime = Mathf.Max(0, smoothDrivingTime - 60f);
 
-                    currentPassenger.negativeInteractions += (int)collisionPenalty;
+                        float collisionPenalty = currentVehicleCategory == VehicleCategory.Luxury ? 1.5f :
+                                                currentVehicleCategory == VehicleCategory.Performance ? 2f : 1f;
+                        if (currentSpeed < 10f)
+                        {
+                            collisionPenalty *= 0.5f;
+                        }
+                        currentPassenger.negativeInteractions += (int)collisionPenalty;
 
-                    if (currentPassenger.passengerType != PassengerType.Silent || UnityEngine.Random.Range(0, 100) < 80)
-                    {
-                        ShowCollisionReaction();
+                        if (currentPassenger.passengerType != PassengerType.Silent || UnityEngine.Random.Range(0, 100) < 80)
+                        {
+                            ShowCollisionReaction();
+                        }
                     }
                 }
                 else if (isCollision && (currentTime - lastCollisionTime) > CollisionRecoveryTime)
@@ -2101,22 +2527,34 @@ namespace UberSideJobMod
         {
             float effectiveSpeedLimit = dynamicSpeedLimit;
             float speedThreshold = effectiveSpeedLimit * (1f + adjustedSpeedingTolerance / 100f);
-            isSpeeding = currentSpeed > speedThreshold;
 
-            if (isSpeeding)
+            if (currentSpeed > speedThreshold)
             {
-                float speedingFactor = currentVehicleCategory == VehicleCategory.Performance ? 0.5f : 1f;
                 float deltaTime = Mathf.Min(currentTime - previousTime, 0.1f);
-                currentPassenger.totalSpeedingTime += deltaTime * speedingFactor;
+                speedingTimer += deltaTime;
 
-                if (currentPassenger.totalSpeedingTime > 10f && currentTime - lastSpeedingNotificationTime >= SpeedingNotificationCooldown)
+                if (!wasSpeeding && speedingTimer > 0.1f)
                 {
-                    lastSpeedingNotificationTime = currentTime;
                     ShowDrivingNotification("speeding", NotificationType.Warning, 3f);
+                    wasSpeeding = true;
+                }
+
+                if (speedingTimer >= 520f)
+                {
+                    float speedingFactor = currentVehicleCategory == VehicleCategory.Performance ? 0.5f : 1f;
+                    currentPassenger.totalSpeedingTime += deltaTime * speedingFactor;
+
+                    if (currentPassenger.totalSpeedingTime > 5f && currentTime - lastSpeedingNotificationTime >= 15f)
+                    {
+                        lastSpeedingNotificationTime = currentTime;
+                        ShowDrivingNotification("speeding", NotificationType.Warning, 3f);
+                    }
                 }
             }
             else
             {
+                speedingTimer = 0f;
+                wasSpeeding = false;
                 float deltaTime = Mathf.Min(currentTime - previousTime, 0.1f);
                 currentPassenger.totalSpeedingTime = Mathf.Max(0, currentPassenger.totalSpeedingTime - (deltaTime * 0.5f));
             }
@@ -2201,26 +2639,30 @@ namespace UberSideJobMod
 
         private float CalculateDynamicSpeedLimit(float? maxVehicleSpeed, VehicleCategory vehicleCategory)
         {
-            float baseSpeedLimit = 50f;
+            float baseSpeedLimit = 18f;
 
             if (maxVehicleSpeed.HasValue)
             {
-                baseSpeedLimit = Mathf.Min(maxVehicleSpeed.Value * 0.8f, 60f);
+                baseSpeedLimit = Mathf.Min(maxVehicleSpeed.Value * 0.22f, 22f);
+                if (maxVehicleSpeed.Value <= 60f)
+                {
+                    baseSpeedLimit = Mathf.Max(baseSpeedLimit, 12f);
+                }
             }
 
             float categoryModifier = vehicleCategory switch
             {
                 VehicleCategory.Luxury => 0.9f,
-                VehicleCategory.Performance => 1.1f,
-                VehicleCategory.Economy => 0.8f,
+                VehicleCategory.Performance => 1.2f,
+                VehicleCategory.Economy => 0.85f,
                 _ => 1f
             };
 
             float neighborhoodModifier = currentNeighborhood switch
             {
-                "Midtown" => 0.8f,
-                "LowerManhattan" => 0.9f,
-                "HellsKitchen" => 0.95f,
+                "Midtown" => 0.85f,
+                "LowerManhattan" => 0.95f,
+                "HellsKitchen" => 1f,
                 _ => 1f
             };
 
@@ -2229,6 +2671,10 @@ namespace UberSideJobMod
 
         private void CleanupCircles()
         {
+            if (!uiManager.EnsureContentPanelActive())
+            {
+                MelonLogger.Error("UberContentPanel unavailable in CleanupCircles!");
+            }
             if (pickupCircle != null)
             {
                 UnityEngine.Object.Destroy(pickupCircle);
@@ -2262,7 +2708,6 @@ namespace UberSideJobMod
                 MelonLogger.Error($"Error saving driver stats: {ex.Message}");
             }
         }
-
         #endregion
     }
 }
