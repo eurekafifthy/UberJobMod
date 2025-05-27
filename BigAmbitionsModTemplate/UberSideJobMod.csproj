@@ -12,79 +12,79 @@
 
   <ItemGroup>
     <Reference Include="Il2CppBigAmbitions">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.dll</HintPath>
     </Reference>
     <Reference Include="Il2CppBigAmbitions.Characters">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.Characters.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.Characters.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppBigAmbitions.InteriorDesigner">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.InteriorDesigner.dll</HintPath>
     </Reference>
     <Reference Include="Il2CppBigAmbitions.Items">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.Items.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.Items.dll</HintPath>
     </Reference>
     <Reference Include="Il2CppBigAmbitions.Neighborhoods">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.Neighborhoods.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppBigAmbitions.Neighborhoods.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppCinemachine">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppCinemachine.dll</HintPath>
     </Reference>
     <Reference Include="Il2CppExternalPlugins">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppExternalPlugins.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppExternalPlugins.dll</HintPath>
     </Reference>
     <Reference Include="Il2CppHGExtensions">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppHGExtensions.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppHGExtensions.dll</HintPath>
     </Reference>
     <Reference Include="Il2CppHGPlugins">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppHGPlugins.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2CppHGPlugins.dll</HintPath>
     </Reference>
     <Reference Include="Il2CppInterop.Common">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\net6\Il2CppInterop.Common.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\net6\Il2CppInterop.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppInterop.Generator">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\net6\Il2CppInterop.Generator.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppInterop.HarmonySupport">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\net6\Il2CppInterop.HarmonySupport.dll</HintPath>
     </Reference>
     <Reference Include="Il2CppInterop.Runtime">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\net6\Il2CppInterop.Runtime.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\net6\Il2CppInterop.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="Il2Cppmscorlib">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2Cppmscorlib.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Il2Cppmscorlib.dll</HintPath>
     </Reference>
     <Reference Include="MelonLoader">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\net6\MelonLoader.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\net6\MelonLoader.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Unity.InputSystem.dll</HintPath>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Unity.TextMeshPro.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\Unity.TextMeshPro.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.AnimationModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.AnimationModule.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.CoreModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.InputLegacyModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.InputModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.InputModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.PhysicsModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.TextCoreFontEngineModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.TextCoreFontEngineModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.TextCoreTextEngineModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.TextCoreTextEngineModule.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.InputModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.TextRenderingModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.UI.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.UI.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UIElementsModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.UIElementsModule.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.UIElementsModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UIModule">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.UIModule.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions\MelonLoader\Il2CppAssemblies\UnityEngine.UIModule.dll</HintPath>
     </Reference>
   </ItemGroup>
 

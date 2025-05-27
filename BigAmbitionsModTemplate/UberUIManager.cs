@@ -12,16 +12,16 @@ using System.Collections;
 using UnityEngine.Events;
 using Il2CppBigAmbitions.Characters;
 
-namespace UberSideJobMod
+namespace RideshareSideJobMod
 {
-    namespace UberSideJobMod
+    namespace RideshareSideJobMod
     {
-        public class UberUIManager
+        public class RideshareUIManager
         {
             private List<GameObject> passengerEntryPool;
             private GameObject poolContainer;
             private int maxEntries = 3;
-            public Action<UberPassenger> OnAcceptPassenger;
+            public Action<RidesharePassenger> OnAcceptPassenger;
             private GameObject uberUICanvas;
             private GameObject uberPanel;
             private RectTransform uberPanelRect;
@@ -165,7 +165,7 @@ namespace UberSideJobMod
                 uberUICanvas.SetActive(visible);
             }
 
-            public void UpdateUI(DriverStats driverStats, UberPassenger currentPassenger, Queue<UberPassenger> passengerPool, bool isPeakHours, bool uberJobActive)
+            public void UpdateUI(DriverStats driverStats, RidesharePassenger currentPassenger, Queue<RidesharePassenger> passengerPool, bool isPeakHours, bool uberJobActive)
             {
                 if (!uiInitialized || uberUICanvas == null || !uberUICanvas.activeSelf)
                 {
@@ -177,7 +177,7 @@ namespace UberSideJobMod
                 {
                     if (!EnsureContentPanelActive())
                     {
-                        MelonLogger.Error("UpdateUI: UberContentPanel unavailable, skipping update.");
+                        MelonLogger.Error("UpdateUI: RideshareContentPanel unavailable, skipping update.");
                         return;
                     }
                     if (driverStatsText == null || driverStatsText.gameObject == null)
@@ -223,7 +223,7 @@ namespace UberSideJobMod
 
                         string tipStatsInfo =
                             $"<color=white>No active passenger requests at the moment.</color>\n" +
-                            $"<color=#8d8f8f>Press F3 to toggle Uber Job.</color>\n\n" +
+                            $"<color=#8d8f8f>Press F3 to toggle Rideshare Job.</color>\n\n" +
                             $"<b><color=white>Tip Statistics:</color></b>\n" +
                             $"Total Tips: <color=yellow><b>${driverStats.totalTipsEarned:F2}</b></color>\n" +
                             $"Highest Tip: <color=yellow><b>${driverStats.highestTip:F2}</b></color>\n" +
@@ -334,11 +334,11 @@ namespace UberSideJobMod
                 }
                 catch (Exception ex)
                 {
-                    MelonLogger.Error($"Error updating Uber UI: {ex.Message}\nStack: {ex.StackTrace}");
+                    MelonLogger.Error($"Error updating Rideshare UI: {ex.Message}\nStack: {ex.StackTrace}");
                 }
             }
 
-            private void UpdatePassengerPoolUI(Queue<UberPassenger> passengerPool)
+            private void UpdatePassengerPoolUI(Queue<RidesharePassenger> passengerPool)
             {
                 foreach (var entry in passengerEntryPool)
                 {
@@ -357,7 +357,7 @@ namespace UberSideJobMod
                     GameObject entry = passengerEntryPool[i];
                     if (i < passengersToShow.Count)
                     {
-                        UberPassenger passenger = passengersToShow[i];
+                        RidesharePassenger passenger = passengersToShow[i];
                         entry.SetActive(true);
                         entry.name = $"PassengerEntry_{passenger.passengerName}";
 
@@ -449,7 +449,7 @@ namespace UberSideJobMod
                 }
 
             }
-            private GameObject CreatePassengerEntry(UberPassenger passenger)
+            private GameObject CreatePassengerEntry(RidesharePassenger passenger)
             {
                 GameObject entry = CreateUIElement("PassengerEntry", poolContainer.transform);
                 RectTransform rt = entry.GetComponent<RectTransform>();
@@ -538,7 +538,7 @@ namespace UberSideJobMod
             }
             private void CreateCanvas()
             {
-                uberUICanvas = new GameObject("UberUICanvas");
+                uberUICanvas = new GameObject("RideshareUICanvas");
                 Canvas canvas = uberUICanvas.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 canvas.sortingOrder = 100;
@@ -554,7 +554,7 @@ namespace UberSideJobMod
 
             private void CreateMainPanel()
             {
-                uberPanel = new GameObject("UberPanel");
+                uberPanel = new GameObject("RidesharePanel");
                 uberPanel.transform.SetParent(uberUICanvas.transform, false);
                 Image panelImage = uberPanel.AddComponent<Image>();
                 panelImage.sprite = roundedSprite;
@@ -595,7 +595,7 @@ namespace UberSideJobMod
                 if (titleText == null)
                 {
                 }
-                titleText.text = "Uber";
+                titleText.text = "Rideshare";
                 titleText.fontSize = 14;
                 titleText.fontStyle = FontStyles.Bold;
                 titleText.color = Color.white;
@@ -605,7 +605,7 @@ namespace UberSideJobMod
                 titleTextRect.anchorMax = Vector2.one;
                 titleTextRect.sizeDelta = Vector2.zero;
 
-                GameObject uberStrip = CreateUIElement("UberColorStrip", titleBar.transform);
+                GameObject uberStrip = CreateUIElement("RideshareColorStrip", titleBar.transform);
                 Image stripImage = uberStrip.AddComponent<Image>();
                 stripImage.color = new Color(0.2f, 0.6f, 1f, 1f);
                 RectTransform stripRect = uberStrip.GetComponent<RectTransform>();
@@ -618,7 +618,7 @@ namespace UberSideJobMod
 
             private GameObject CreateContentPanel()
             {
-                GameObject contentPanel = CreateUIElement("UberContentPanel", uberPanel.transform);
+                GameObject contentPanel = CreateUIElement("RideshareContentPanel", uberPanel.transform);
                 RectTransform contentRect = contentPanel.GetComponent<RectTransform>();
                 contentRect.anchorMin = new Vector2(0, 0);
                 contentRect.anchorMax = new Vector2(1, 1);
@@ -840,7 +840,7 @@ namespace UberSideJobMod
 
             public bool EnsureContentPanelActive()
             {
-                GameObject contentPanel = uberPanel?.transform.Find("UberContentPanel")?.gameObject;
+                GameObject contentPanel = uberPanel?.transform.Find("RideshareContentPanel")?.gameObject;
                 if (contentPanel == null)
                 {
                     return false;

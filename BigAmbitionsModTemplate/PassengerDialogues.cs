@@ -3,7 +3,7 @@ using Il2CppEnums;
 using MelonLoader;
 using System.Linq;
 
-namespace UberSideJobMod
+namespace RideshareSideJobMod
 {
     public static class PassengerDialogues
     {
@@ -50,7 +50,7 @@ namespace UberSideJobMod
                                 "Been busy today, dude?",
                                 "Nice weather we’re having, right?",
                                 "Thanks for the ride, bro!",
-                                "I take Uber every day—good gig, man?",
+                                "I take Rideshare every day—good gig, man?",
                                 "Just heading home from work, same as you?",
                                 "You been driving long today, pal?",
                                 "Traffic’s wild around here, huh?",
@@ -70,7 +70,7 @@ namespace UberSideJobMod
                                 "You keeping busy today?",
                                 "Isn’t the weather just lovely?",
                                 "Thanks for the ride!",
-                                "I’m an Uber regular—you enjoy driving?",
+                                "I’m an Rideshare regular—you enjoy driving?",
                                 "Heading home from work—long day?",
                                 "You been out here driving all day?",
                                 "Traffic’s always nuts here, right?",

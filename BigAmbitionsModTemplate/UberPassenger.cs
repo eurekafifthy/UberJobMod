@@ -6,14 +6,14 @@ using System.Threading.Tasks;
 using Il2CppCharacter.Customization;
 using UnityEngine;
 
-namespace UberSideJobMod
+namespace RideshareSideJobMod
 {
     public enum Gender
     {
         Male,
         Female
     }
-    public class UberPassenger
+    public class RidesharePassenger
     {
         public int collisionCount { get; set; } = 0;
 

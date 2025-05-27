@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using MelonLoader;
 using Il2CppUI.Notification;
 
-namespace UberSideJobMod
+namespace RideshareSideJobMod
 {
     public enum NotificationType
     {
@@ -16,7 +16,7 @@ namespace UberSideJobMod
         Warning
     }
 
-    public class UberNotificationUI
+    public class RideshareNotificationUI
     {
         private static GameObject notificationCanvas;
         private static Transform notificationContainer;
@@ -57,7 +57,7 @@ namespace UberSideJobMod
             {
                 if (notificationCanvas == null)
                 {
-                    notificationCanvas = new GameObject("UberSideJobNotificationCanvas");
+                    notificationCanvas = new GameObject("RideshareSideJobNotificationCanvas");
                     GameObject.DontDestroyOnLoad(notificationCanvas);
                 }
             }
@@ -113,7 +113,7 @@ namespace UberSideJobMod
             GameObject container = null;
             try
             {
-                container = new GameObject("UberSideJobNotificationContainer");
+                container = new GameObject("RideshareSideJobNotificationContainer");
                 container.transform.SetParent(notificationCanvas.transform, false);
             }
             catch (Exception)
@@ -252,7 +252,7 @@ namespace UberSideJobMod
                 }
             }
 
-            GameObject notification = new GameObject("UberSideJobNotification");
+            GameObject notification = new GameObject("RideshareSideJobNotification");
             notification.transform.SetParent(notificationContainer, false);
             activeNotifications.Add(notification);
 

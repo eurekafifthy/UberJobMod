@@ -1,6 +1,6 @@
 ﻿using Il2CppEnums;
 
-namespace UberSideJobMod
+namespace RideshareSideJobMod
 {
     public class Address
     {

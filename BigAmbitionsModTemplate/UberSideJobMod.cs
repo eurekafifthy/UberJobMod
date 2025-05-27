@@ -14,16 +14,16 @@ using Il2CppUI.Smartphone.Apps.Persona;
 using Il2CppVehicles.VehicleTypes;
 using Il2CppEnums;
 using Newtonsoft.Json;
-using UberSideJobMod.UberSideJobMod;
+using RideshareSideJobMod.RideshareSideJobMod;
 using UnityEngine.EventSystems;
 
-namespace UberSideJobMod
+namespace RideshareSideJobMod
 {
-    public class UberJobMod : MelonMod
+    public class RideshareJobMod : MelonMod
     {
         #region Fields
         // Queue system 
-        private Queue<UberPassenger> passengerPool;
+        private Queue<RidesharePassenger> passengerPool;
         private const float MaxPoolTime = 60f;
 
         // Constants
@@ -35,7 +35,7 @@ namespace UberSideJobMod
         private const float PickupConfirmTime = 0.15f;
         private float timeSinceLastOutsideZone = 0f;
         private const float PassengerOfferInterval = 30f;
-        private const float UberJobCooldown = 120f;
+        private const float RideshareJobCooldown = 120f;
         private const float MaxWaitingTime = 300f;
         private const float ConversationInterval = 20f;
         private const float CollisionRecoveryTime = 8f;
@@ -54,12 +54,12 @@ namespace UberSideJobMod
 
         // Core State
         private bool uberJobActive = false;
-        private bool showUberUI = false;
-        private UberPassenger currentPassenger = null;
+        private bool showRideshareUI = false;
+        private RidesharePassenger currentPassenger = null;
         private DriverStats driverStats = new DriverStats();
         private List<Address> addresses = new List<Address>();
-        private UberUIManager uiManager;
-        private UberNotificationUI notificationUI;
+        private RideshareUIManager uiManager;
+        private RideshareNotificationUI notificationUI;
 
         // Game Objects and References
         private GameObject pickupCircle;
@@ -98,7 +98,7 @@ namespace UberSideJobMod
 
         // Timing and Intervals
         private float lastPassengerOfferTime = 0f;
-        private float lastJobCompletionTime = -UberJobCooldown;
+        private float lastJobCompletionTime = -RideshareJobCooldown;
         private float lastConversationTime = 0f;
 
         // Passenger Logic
@@ -123,8 +123,8 @@ namespace UberSideJobMod
         #region Initialization
         public override void OnInitializeMelon()
         {
-            passengerPool = new Queue<UberPassenger>();
-            MelonLogger.Msg("Uber Mod Big Ambitions - loaded successfully!");
+            passengerPool = new Queue<RidesharePassenger>();
+            MelonLogger.Msg("Rideshare Mod Big Ambitions - loaded successfully!");
             LoadDriverStats();
             InitializeTipSystem();
             MelonCoroutines.Start(WaitForGameLoad());
@@ -133,13 +133,13 @@ namespace UberSideJobMod
 
         private void InitializeComponents()
         {
-            uiManager = new UberUIManager();
+            uiManager = new RideshareUIManager();
             uiManager.InitializeUI();
             uiManager.OnAcceptPassenger += OnAcceptPassenger;
             uiManager.OnCancelClicked += OnCancelButtonClicked;
             uiManager.SetUIVisible(false);
 
-            notificationUI = new UberNotificationUI();
+            notificationUI = new RideshareNotificationUI();
             notificationUI.Initialize();
         }
 
@@ -201,7 +201,7 @@ namespace UberSideJobMod
 
             InitializeComponents();
 
-            MelonCoroutines.Start(EfficientUberJobRoutine());
+            MelonCoroutines.Start(EfficientRideshareJobRoutine());
             MelonCoroutines.Start(TimeCheckRoutine());
         }
 
@@ -214,7 +214,7 @@ namespace UberSideJobMod
             {
                 try
                 {
-                    playerCharacterData = Il2CppHelpers.PlayerHelper.GetPlayerCharacterData();
+                    playerCharacterData = Il2CppHelpers.PlayerHelper.CharacterData;
                 }
                 catch
                 {
@@ -270,11 +270,11 @@ namespace UberSideJobMod
         {
             const float timeout = 15f;
             float elapsed = 0f;
-            CharacterInfo characterInfo = null;
+            Il2CppUI.Smartphone.Apps.Persona.CharacterInfo characterInfo = null;
 
             while (characterInfo == null && elapsed < timeout)
             {
-                characterInfo = GameObject.FindObjectOfType<CharacterInfo>();
+                characterInfo = GameObject.FindObjectOfType<Il2CppUI.Smartphone.Apps.Persona.CharacterInfo>();
                 if (characterInfo == null)
                 {
                     yield return new WaitForSeconds(0.5f);
@@ -328,7 +328,7 @@ namespace UberSideJobMod
                             var buildingTypeObj = buildingRegistration.GetBuildingType();
                             buildingType = buildingTypeObj != null ? buildingTypeObj.ToString() : "Unknown";
                             businessType = buildingRegistration.businessTypeName;
-                            var neighborhoodObj = buildingRegistration.GetNeighborhood();
+                            var neighborhoodObj = buildingRegistration.Neighborhood;
                             neighborhood = neighborhoodObj != null ? neighborhoodObj.ToString() : "Unknown Area";
 
                             if (buildingType.ToLower() is "residential" or "warehouse" or "special")
@@ -371,7 +371,7 @@ namespace UberSideJobMod
         {
             try
             {
-                string saveDir = Path.Combine(MelonEnvironment.UserDataDirectory, "UberJobMod");
+                string saveDir = Path.Combine(MelonEnvironment.UserDataDirectory, "RideshareJobMod");
                 string savePath = Path.Combine(saveDir, "DriverStats.json");
 
                 if (!Directory.Exists(saveDir))
@@ -394,7 +394,7 @@ namespace UberSideJobMod
         #endregion
 
         #region Coroutines
-        private IEnumerator EfficientUberJobRoutine()
+        private IEnumerator EfficientRideshareJobRoutine()
         {
             float idleTimeWithoutJob = 0f;
             float lastDrivingStateUpdate = 0f;
@@ -404,7 +404,7 @@ namespace UberSideJobMod
                 float waitTime = uberJobActive ? 0.5f : 1f;
                 bool shouldContinue = false;
 
-                if (showUberUI || uberJobActive)
+                if (showRideshareUI || uberJobActive)
                 {
                     try
                     {
@@ -419,10 +419,10 @@ namespace UberSideJobMod
                         {
                             if (passengerPool == null)
                             {
-                                passengerPool = new Queue<UberPassenger>();
+                                passengerPool = new Queue<RidesharePassenger>();
                             }
 
-                            Queue<UberPassenger> tempQueue = new Queue<UberPassenger>();
+                            Queue<RidesharePassenger> tempQueue = new Queue<RidesharePassenger>();
                             int originalCount = passengerPool.Count;
 
                             for (int i = 0; i < originalCount; i++)
@@ -432,7 +432,7 @@ namespace UberSideJobMod
                                     break;
                                 }
 
-                                UberPassenger passenger = passengerPool.Dequeue();
+                                RidesharePassenger passenger = passengerPool.Dequeue();
                                 if (passenger == null)
                                 {
                                     continue;
@@ -492,7 +492,7 @@ namespace UberSideJobMod
                     }
                     catch (Exception ex)
                     {
-                        MelonLogger.Error($"Error in EfficientUberJobRoutine: {ex.Message}\nStack: {ex.StackTrace}");
+                        MelonLogger.Error($"Error in EfficientRideshareJobRoutine: {ex.Message}\nStack: {ex.StackTrace}");
                     }
                 }
 
@@ -532,7 +532,7 @@ namespace UberSideJobMod
             conversationShown = false;
         }
 
-        private IEnumerator RequestRatingAfterDelay(float delay, UberPassenger passenger)
+        private IEnumerator RequestRatingAfterDelay(float delay, RidesharePassenger passenger)
         {
             yield return new WaitForSeconds(delay);
 
@@ -605,7 +605,7 @@ namespace UberSideJobMod
         private IEnumerator HideUIAfterDelay(float delay)
         {
             yield return new WaitForSeconds(delay);
-            showUberUI = false;
+            showRideshareUI = false;
             uiManager.SetUIVisible(false);
         }
 
@@ -657,7 +657,7 @@ namespace UberSideJobMod
                 UpdateNeighborhood();
             }
 
-            if (showUberUI)
+            if (showRideshareUI)
             {
                 UpdateUITitle();
                 uiManager.UpdateUI(driverStats, currentPassenger, passengerPool, isPeakHours, uberJobActive);
@@ -679,7 +679,7 @@ namespace UberSideJobMod
 
                 if (!string.IsNullOrEmpty(vehicleName))
                 {
-                    string newTitle = $"Uber | {playerName} | {vehicleName}";
+                    string newTitle = $"Rideshare | {playerName} | {vehicleName}";
 
                     if (uiManager.titleText.text != newTitle)
                     {
@@ -691,18 +691,18 @@ namespace UberSideJobMod
 
         private void ToggleUI()
         {
-            showUberUI = !showUberUI;
-            uiManager.SetUIVisible(showUberUI);
+            showRideshareUI = !showRideshareUI;
+            uiManager.SetUIVisible(showRideshareUI);
 
-            if (showUberUI && !uberJobActive && passengerPool.Count == 0 &&
-                Time.time - lastJobCompletionTime > UberJobCooldown)
+            if (showRideshareUI && !uberJobActive && passengerPool.Count == 0 &&
+                Time.time - lastJobCompletionTime > RideshareJobCooldown)
             {
                 GenerateNewPassengerForPool();
                 lastPassengerOfferTime = Time.time;
             }
         }
 
-        private void OnAcceptPassenger(UberPassenger passenger)
+        private void OnAcceptPassenger(RidesharePassenger passenger)
         {
             currentPassenger = passenger;
             uberJobActive = true;
@@ -715,7 +715,7 @@ namespace UberSideJobMod
             suddenStopCooldown = 0f;
             isCollision = false;
 
-            Queue<UberPassenger> tempQueue = new Queue<UberPassenger>();
+            Queue<RidesharePassenger> tempQueue = new Queue<RidesharePassenger>();
             while (passengerPool.Count > 0)
             {
                 var queuedPassenger = passengerPool.Dequeue();
@@ -733,9 +733,9 @@ namespace UberSideJobMod
             uberJobActive = false;
             CleanupCircles();
             currentPassenger = null;
-            showUberUI = true;
-            uiManager.SetUIVisible(showUberUI);
-            ShowNotification("Uber ride canceled by driver.");
+            showRideshareUI = true;
+            uiManager.SetUIVisible(showRideshareUI);
+            ShowNotification("Rideshare ride canceled by driver.");
             SaveDriverStats();
             uiManager.UpdateUI(driverStats, currentPassenger, passengerPool, isPeakHours, uberJobActive);
             lastPassengerOfferTime = Time.time - PassengerOfferInterval + 15f;
@@ -1041,7 +1041,7 @@ namespace UberSideJobMod
             conversationLines.AddRange(PassengerDialogues.Comments[passengerType]["regular"][passengerGender]);
 
             // Create passenger
-            var newPassenger = new UberPassenger
+            var newPassenger = new RidesharePassenger
             {
                 pickupAddress = pickupAddress,
                 dropoffAddress = dropoffAddress,
@@ -1631,7 +1631,7 @@ namespace UberSideJobMod
 
                 if (timeAtPickupAddress >= PickupConfirmTime)
                 {
-                    CompleteUberJob();
+                    CompleteRideshareJob();
                     timeAtPickupAddress = 0f;
                 }
             }
@@ -1645,7 +1645,7 @@ namespace UberSideJobMod
             }
         }
 
-        private void CompleteUberJob()
+        private void CompleteRideshareJob()
         {
             isCompletingJob = true;
 
@@ -1660,7 +1660,7 @@ namespace UberSideJobMod
             }
 
             string completionMessage =
-            $"Uber job completed!\n\n" +
+            $"Rideshare job completed!\n\n" +
             $"You earned <color=yellow>${currentPassenger.fare:F2}</color> fare" +
             (receivedTip ? $" + <color=yellow>${tipAmount:F2}</color> tip!" : "") + "\n" +
             $"<color=yellow>{currentPassenger.passengerName}</color> has arrived at " +
@@ -1686,12 +1686,12 @@ namespace UberSideJobMod
             isSpeeding = false;
 
             MelonCoroutines.Start(RequestRatingAfterDelay(3f, completedPassenger));
-            showUberUI = true;
-            uiManager.SetUIVisible(showUberUI);
+            showRideshareUI = true;
+            uiManager.SetUIVisible(showRideshareUI);
 
             if (!uiManager.EnsureContentPanelActive())
             {
-                MelonLogger.Error("Failed to ensure UberContentPanel is active after CompleteUberJob!");
+                MelonLogger.Error("Failed to ensure RideshareContentPanel is active after CompleteRideshareJob!");
             }
 
             SaveDriverStats();
@@ -1721,7 +1721,7 @@ namespace UberSideJobMod
             driverStats.mostVisitedNeighborhood = mostVisited.Key;
         }
 
-        private float CalculateTipAmount(UberPassenger passenger)
+        private float CalculateTipAmount(RidesharePassenger passenger)
         {
             if (passenger == null || passenger.tipCalculated)
             {
@@ -1764,7 +1764,7 @@ namespace UberSideJobMod
             return tipAmount;
         }
 
-        private float AdjustTipChanceForDriving(float tipChance, UberPassenger passenger, List<string> tipFactors)
+        private float AdjustTipChanceForDriving(float tipChance, RidesharePassenger passenger, List<string> tipFactors)
         {
             if (passenger.collisionCount == 0 && passenger.suddenStopCount <= 1 && passenger.totalSpeedingTime < 15f)
             {
@@ -1779,7 +1779,7 @@ namespace UberSideJobMod
             return tipChance;
         }
 
-        private float AdjustTipChanceForInteractions(float tipChance, UberPassenger passenger, List<string> tipFactors)
+        private float AdjustTipChanceForInteractions(float tipChance, RidesharePassenger passenger, List<string> tipFactors)
         {
             float conversationFactor = 1.0f;
 
@@ -1801,7 +1801,7 @@ namespace UberSideJobMod
             return tipChance * conversationFactor;
         }
 
-        private float AdjustTipChanceForTiming(float tipChance, UberPassenger passenger, List<string> tipFactors)
+        private float AdjustTipChanceForTiming(float tipChance, RidesharePassenger passenger, List<string> tipFactors)
         {
             if (passenger.waitTime < 60f)
             {
@@ -1845,7 +1845,7 @@ namespace UberSideJobMod
             return tipChance;
         }
 
-        private float AdjustTipChanceForVehicle(float tipChance, UberPassenger passenger, List<string> tipFactors)
+        private float AdjustTipChanceForVehicle(float tipChance, RidesharePassenger passenger, List<string> tipFactors)
         {
             float vehicleTipModifier = currentVehicleCategory switch
             {
@@ -1897,7 +1897,7 @@ namespace UberSideJobMod
             return tipChance * vehicleTipModifier;
         }
 
-        private float CalculateBaseTipPercentage(UberPassenger passenger)
+        private float CalculateBaseTipPercentage(RidesharePassenger passenger)
         {
             float conversationFactor = 1.0f;
 
@@ -1939,7 +1939,7 @@ namespace UberSideJobMod
             return Mathf.Clamp(baseTipPercentage, 0.05f, 0.5f);
         }
 
-        private void UpdateDriverTipStats(float tipAmount, UberPassenger passenger, float baseTipPercentage)
+        private void UpdateDriverTipStats(float tipAmount, RidesharePassenger passenger, float baseTipPercentage)
         {
             driverStats.totalTipsEarned += tipAmount;
             driverStats.ridesWithTips++;
@@ -2684,7 +2684,7 @@ namespace UberSideJobMod
         {
             if (!uiManager.EnsureContentPanelActive())
             {
-                MelonLogger.Error("UberContentPanel unavailable in CleanupCircles!");
+                MelonLogger.Error("RideshareContentPanel unavailable in CleanupCircles!");
             }
             if (pickupCircle != null)
             {
@@ -2703,7 +2703,7 @@ namespace UberSideJobMod
         {
             try
             {
-                string saveDir = Path.Combine(MelonEnvironment.UserDataDirectory, "UberJobMod");
+                string saveDir = Path.Combine(MelonEnvironment.UserDataDirectory, "RideshareJobMod");
                 string savePath = Path.Combine(saveDir, "DriverStats.json");
 
                 if (!Directory.Exists(saveDir))
